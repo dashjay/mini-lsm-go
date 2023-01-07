@@ -9,42 +9,59 @@ import (
 	"unsafe"
 
 	"github.com/dashjay/mini-lsm-go/pkg/block"
+	"github.com/stretchr/testify/assert"
 )
 
-var (
-	Key1   = []byte("key1")
-	Value1 = []byte("value1")
+func KeyOf(idx uint64) []byte {
+	return s2b(fmt.Sprintf("key_%d", idx))
+}
 
-	Key2   = []byte("key2")
-	Value2 = []byte("value2")
+func ValueOf(idx uint64) []byte {
+	return s2b(fmt.Sprintf("value_%d", idx))
+}
 
-	Key3   = []byte("key3")
-	Value3 = []byte("value3")
-)
-
-func randomBlock() *block.Block {
-	bb := block.NewBlockBuilder(65535)
-	bb.AddByte(Key1, Value1)
-	bb.AddByte(Key2, Value2)
-	bb.AddByte(Key3, Value3)
+func generateBlock(t *testing.T) *block.Block {
+	bb := block.NewBlockBuilder(10000)
+	for i := uint64(0); i < 100; i++ {
+		key := KeyOf(i)
+		val := ValueOf(i)
+		assert.Equal(t, true, bb.AddByte(key, val))
+	}
 	return bb.Build()
 }
 
+func TestGenerateBlock(t *testing.T) {
+	generateBlock(t)
+}
+
+func TestBlockBuilderMisc(t *testing.T) {
+	t.Run("test-block-builderr-single-key", func(t *testing.T) {
+		builder := block.NewBlockBuilder(16)
+		assert.Equal(t, true, builder.AddByte([]byte("233"), []byte("233333")))
+		builder.Build()
+	})
+
+	t.Run("test-block-builder-full", func(t *testing.T) {
+		builder := block.NewBlockBuilder(16)
+		assert.Equal(t, true, builder.AddByte([]byte("11"), []byte("11")))
+		assert.Equal(t, false, builder.AddByte([]byte("22"), []byte("22")))
+		builder.Build()
+	})
+}
 func TestBlockEncode(t *testing.T) {
-	b := randomBlock()
-	t.Log(b.Encode())
+	b := generateBlock(t)
+	_ = b.Encode()
 }
 
 func TestBlockDecode(t *testing.T) {
-	b := randomBlock()
+	b := generateBlock(t)
 	be := b.Encode()
 	db := &block.Block{}
 	db.Decode(be)
-	t.Log(db)
 }
 
 func TestBlockIter(t *testing.T) {
-	b := randomBlock()
+	b := generateBlock(t)
 	be := b.Encode()
 	db := &block.Block{}
 	db.Decode(be)
@@ -52,17 +69,23 @@ func TestBlockIter(t *testing.T) {
 	iter := block.NewBLockIter(db)
 
 	iter.SeekToFirst()
-	if !bytes.Equal(iter.Key(), Key1) || !bytes.Equal(iter.Value(), Value1) {
+	key0 := KeyOf(0)
+	value0 := KeyOf(0)
+	if !bytes.Equal(iter.Key(), key0) || !bytes.Equal(iter.Value(), value0) {
 		t.Error("seek to first error")
 	}
 
 	iter.Next()
-	if !bytes.Equal(iter.Key(), Key2) || !bytes.Equal(iter.Value(), Value2) {
+	key1 := KeyOf(1)
+	value1 := KeyOf(1)
+	if !bytes.Equal(iter.Key(), key1) || !bytes.Equal(iter.Value(), value1) {
 		t.Error("seek to next error")
 	}
 
-	iter.SeekToKey(Key3)
-	if !bytes.Equal(iter.Key(), Key3) || !bytes.Equal(iter.Value(), Value3) {
+	key50 := KeyOf(50)
+	value50 := KeyOf(50)
+	iter.SeekToKey(key50)
+	if !bytes.Equal(iter.Key(), key50) || !bytes.Equal(iter.Value(), value50) {
 		t.Error("seek to key error")
 	}
 }
