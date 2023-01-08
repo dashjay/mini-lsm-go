@@ -4,7 +4,10 @@ import (
 	"encoding/binary"
 )
 
-const SizeOfUint16 = 2
+const (
+	SizeOfUint16 = 2
+	SizeOfUint32 = 4
+)
 
 type Block struct {
 	data    []byte

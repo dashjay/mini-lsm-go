@@ -5,15 +5,15 @@ import (
 	"encoding/binary"
 )
 
-type BlockIter struct {
+type Iter struct {
 	block *Block
 	key   []byte
 	value []byte
 	idx   uint64
 }
 
-func NewBLockIter(block *Block) *BlockIter {
-	return &BlockIter{
+func NewBlockIter(block *Block) *Iter {
+	return &Iter{
 		block: block,
 		key:   make([]byte, 0),
 		value: make([]byte, 0),
@@ -21,15 +21,27 @@ func NewBLockIter(block *Block) *BlockIter {
 	}
 }
 
-func (b *BlockIter) isValid() bool {
-	return len(b.key) != 0
+func NewBlockIterAndSeekToFirst(block *Block) *Iter {
+	i := NewBlockIter(block)
+	i.SeekTo(0)
+	return i
 }
 
-func (b *BlockIter) SeekToFirst() {
+func NewBlockIterAndSeekToKey(block *Block, key []byte) *Iter {
+	i := NewBlockIter(block)
+	i.SeekToKey(key)
+	return i
+}
+
+func (b *Iter) IsValid() bool {
+	return b.block != nil && len(b.key) != 0
+}
+
+func (b *Iter) SeekToFirst() {
 	b.SeekTo(0)
 }
 
-func (b *BlockIter) Key() []byte {
+func (b *Iter) Key() []byte {
 	if len(b.key) == 0 {
 		panic("invalid iterator")
 	}
@@ -40,7 +52,7 @@ func (b *BlockIter) Key() []byte {
 	return b.key
 }
 
-func (b *BlockIter) Value() []byte {
+func (b *Iter) Value() []byte {
 	if len(b.key) == 0 {
 		panic("invalid iterator")
 	}
@@ -51,7 +63,10 @@ func (b *BlockIter) Value() []byte {
 	return b.value
 }
 
-func (b *BlockIter) SeekTo(idx uint64) {
+func (b *Iter) SeekTo(idx uint64) {
+	if b.block == nil {
+		return
+	}
 	if idx >= uint64(len(b.block.offsets)) {
 		b.key = nil
 		b.value = nil
@@ -62,19 +77,25 @@ func (b *BlockIter) SeekTo(idx uint64) {
 	b.idx = idx
 }
 
-func (b *BlockIter) Next() {
+func (b *Iter) Next() {
+	if b.block == nil {
+		return
+	}
 	b.idx++
 	b.SeekTo(b.idx)
 }
 
-func (b *BlockIter) SeekToKey(key []byte) {
+func (b *Iter) SeekToKey(key []byte) {
+	if b.block == nil {
+		return
+	}
 	low := 0
 	high := len(b.block.offsets)
 
 	for low < high {
 		mid := (low + (high-low)/2)
 		b.SeekTo(uint64(mid))
-		if !b.isValid() {
+		if !b.IsValid() {
 			panic("invalid block")
 		}
 		switch bytes.Compare(b.key, key) {
@@ -89,7 +110,7 @@ func (b *BlockIter) SeekToKey(key []byte) {
 	b.SeekTo(uint64(low))
 }
 
-func (b *BlockIter) seekToOffset(offset uint64) {
+func (b *Iter) seekToOffset(offset uint64) {
 	entry := b.block.data[offset:]
 
 	keyLen := binary.BigEndian.Uint16(entry[:2])

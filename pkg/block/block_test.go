@@ -12,6 +12,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func s2b(s string) []byte {
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bh := reflect.SliceHeader{
+		Data: sh.Data,
+		Len:  sh.Len,
+		Cap:  sh.Len,
+	}
+	return *(*[]byte)(unsafe.Pointer(&bh))
+}
+
 func KeyOf(idx uint64) []byte {
 	return s2b(fmt.Sprintf("key_%d", idx))
 }
@@ -28,6 +38,15 @@ func generateBlock(t *testing.T) *block.Block {
 		assert.Equal(t, true, bb.AddByte(key, val))
 	}
 	return bb.Build()
+}
+
+func generateBlockMeta() []*block.Meta {
+	var res []*block.Meta
+	for i := uint64(0); i < 100; i++ {
+		key := KeyOf(i)
+		res = append(res, &block.Meta{Offset: uint32(i), FirstKey: key})
+	}
+	return res
 }
 
 func TestGenerateBlock(t *testing.T) {
@@ -47,26 +66,26 @@ func TestBlockBuilderMisc(t *testing.T) {
 		assert.Equal(t, false, builder.AddByte([]byte("22"), []byte("22")))
 		builder.Build()
 	})
-}
-func TestBlockEncode(t *testing.T) {
-	b := generateBlock(t)
-	_ = b.Encode()
-}
+	t.Run("test-block-encode", func(t *testing.T) {
+		b := generateBlock(t)
+		_ = b.Encode()
+	})
 
-func TestBlockDecode(t *testing.T) {
-	b := generateBlock(t)
-	be := b.Encode()
-	db := &block.Block{}
-	db.Decode(be)
+	t.Run("test-block-decode", func(t *testing.T) {
+		b := generateBlock(t)
+		be := b.Encode()
+		db := &block.Block{}
+		db.Decode(be)
+		assert.Equal(t, *b, *db)
+	})
 }
-
 func TestBlockIter(t *testing.T) {
 	b := generateBlock(t)
 	be := b.Encode()
 	db := &block.Block{}
 	db.Decode(be)
 
-	iter := block.NewBLockIter(db)
+	iter := block.NewBlockIter(db)
 
 	iter.SeekToFirst()
 	key0 := KeyOf(0)
@@ -88,6 +107,29 @@ func TestBlockIter(t *testing.T) {
 	if !bytes.Equal(iter.Key(), key50) || !bytes.Equal(iter.Value(), value50) {
 		t.Error("seek to key error")
 	}
+}
+
+func TestBlockMeta(t *testing.T) {
+	t.Run("test-block-meta-encode", func(t *testing.T) {
+		bms := generateBlockMeta()
+		buf := make([]byte, 200)
+		rand.Read(buf)
+		input := buf
+		block.AppendEncodedBlockMeta(bms, input)
+		assert.Equal(t, buf, input[:200])
+	})
+
+	t.Run("test-block-meta-decode", func(t *testing.T) {
+		bms := generateBlockMeta()
+		buf := make([]byte, 200)
+		rand.Read(buf)
+		input := buf
+		input = block.AppendEncodedBlockMeta(bms, input)
+		assert.Equal(t, buf, input[:200])
+		metas := block.DecodeBlockMeta(input[200:])
+		assert.Equal(t, len(bms), len(metas))
+		assert.Equal(t, bms, metas)
+	})
 }
 
 func BenchmarkBlockEncode(b *testing.B) {
@@ -129,7 +171,7 @@ func BenchmarkBlockIter(b *testing.B) {
 	for i := 0; i < count; i++ {
 		bb.Add(fmt.Sprintf("key-%d", i), fmt.Sprintf("value-%d", i))
 	}
-	iter := block.NewBLockIter(bb.Build())
+	iter := block.NewBlockIter(bb.Build())
 
 	b.Run("test seek to idx", func(b *testing.B) {
 		idx := rand.Uint64() % uint64(count)
@@ -147,14 +189,4 @@ func BenchmarkBlockIter(b *testing.B) {
 		keyNotExists := s2b(fmt.Sprintf("key-%d", idx))
 		iter.SeekToKey(keyNotExists)
 	})
-}
-
-func s2b(s string) []byte {
-	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bh := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&bh))
 }

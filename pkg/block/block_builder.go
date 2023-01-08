@@ -1,30 +1,32 @@
 package block
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
-type BlockBuilder struct {
+type Builder struct {
 	offsets   []uint16
 	data      []byte
 	blockSize uint64
 }
 
-func NewBlockBuilder(size uint64) *BlockBuilder {
-	return &BlockBuilder{
+func NewBlockBuilder(size uint64) *Builder {
+	return &Builder{
 		offsets:   make([]uint16, 0),
 		data:      make([]byte, 0),
 		blockSize: size,
 	}
 }
 
-func (b *BlockBuilder) estimatedSzie() uint64 {
+func (b *Builder) estimatedSzie() uint64 {
 	return uint64(len(b.offsets))*SizeOfUint16 + uint64(len(b.data)) + SizeOfUint16
 }
 
-func (b *BlockBuilder) isEmpty() bool {
+func (b *Builder) isEmpty() bool {
 	return len(b.offsets) == 0
 }
 
-func (b *BlockBuilder) Add(Key, Value string) bool {
+func (b *Builder) Add(Key, Value string) bool {
 	if Key == "" {
 		panic("key must not be empty")
 	}
@@ -41,7 +43,7 @@ func (b *BlockBuilder) Add(Key, Value string) bool {
 	return true
 }
 
-func (b *BlockBuilder) AddByte(Key, Value []byte) bool {
+func (b *Builder) AddByte(Key, Value []byte) bool {
 	if len(Key) == 0 {
 		panic("key must not be empty")
 	}
@@ -58,7 +60,7 @@ func (b *BlockBuilder) AddByte(Key, Value []byte) bool {
 	return true
 }
 
-func (b *BlockBuilder) Build() *Block {
+func (b *Builder) Build() *Block {
 	if b.isEmpty() {
 		panic("block should not be empty")
 	}
