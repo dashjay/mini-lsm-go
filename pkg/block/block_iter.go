@@ -33,6 +33,10 @@ func (b *BlockIter) Key() []byte {
 	if len(b.key) == 0 {
 		panic("invalid iterator")
 	}
+	// WARNING: we assumed that return key will not be modified
+	// key := make([]byte, len(b.key))
+	// copy(key, b.key)
+	// return key
 	return b.key
 }
 
@@ -40,6 +44,10 @@ func (b *BlockIter) Value() []byte {
 	if len(b.key) == 0 {
 		panic("invalid iterator")
 	}
+	// WARNING: we assumed that return value will not be modified
+	// value := make([]byte, len(b.value))
+	// copy(value, b.value)
+	// return value
 	return b.value
 }
 
@@ -83,8 +91,8 @@ func (b *BlockIter) SeekToKey(key []byte) {
 
 func (b *BlockIter) seekToOffset(offset uint64) {
 	entry := b.block.data[offset:]
-	keyLen := binary.BigEndian.Uint16(entry[:2])
 
+	keyLen := binary.BigEndian.Uint16(entry[:2])
 	entry = entry[2:]
 	b.key = append(b.key[:0], entry[:keyLen]...)
 	entry = entry[keyLen:]

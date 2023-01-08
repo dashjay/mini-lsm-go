@@ -70,20 +70,20 @@ func TestBlockIter(t *testing.T) {
 
 	iter.SeekToFirst()
 	key0 := KeyOf(0)
-	value0 := KeyOf(0)
+	value0 := ValueOf(0)
 	if !bytes.Equal(iter.Key(), key0) || !bytes.Equal(iter.Value(), value0) {
 		t.Error("seek to first error")
 	}
 
 	iter.Next()
 	key1 := KeyOf(1)
-	value1 := KeyOf(1)
+	value1 := ValueOf(1)
 	if !bytes.Equal(iter.Key(), key1) || !bytes.Equal(iter.Value(), value1) {
 		t.Error("seek to next error")
 	}
 
 	key50 := KeyOf(50)
-	value50 := KeyOf(50)
+	value50 := ValueOf(50)
 	iter.SeekToKey(key50)
 	if !bytes.Equal(iter.Key(), key50) || !bytes.Equal(iter.Value(), value50) {
 		t.Error("seek to key error")
