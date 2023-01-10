@@ -13,6 +13,7 @@ type Meta struct {
 	FirstKey []byte
 }
 
+// AppendEncodedBlockMeta help append all metaData to bytes buffer
 func AppendEncodedBlockMeta(metaList []*Meta, buf []byte) []byte {
 	estimatedSize := 0
 	for _, meta := range metaList {
@@ -32,6 +33,7 @@ func AppendEncodedBlockMeta(metaList []*Meta, buf []byte) []byte {
 	return buf
 }
 
+// DecodeBlockMeta read []*Meta from byte slice
 func DecodeBlockMeta(input []byte) []*Meta {
 	var metas = make([]*Meta, 0)
 	for len(input) > 0 {
@@ -76,6 +78,7 @@ func readUint16(r io.Reader) (uint16, error) {
 	return binary.BigEndian.Uint16(temp[:]), nil
 }
 
+// DecodeBlockMetaFromReader reads []*Meta from reader
 func DecodeBlockMetaFromReader(r io.Reader) ([]*Meta, error) {
 	var metas = make([]*Meta, 0)
 	for {

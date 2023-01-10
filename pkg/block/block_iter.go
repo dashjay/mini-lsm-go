@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 )
 
+// Iter can hold an Block, for iterating it one-by-one.
 type Iter struct {
 	block *Block
 	key   []byte
@@ -12,6 +13,7 @@ type Iter struct {
 	idx   uint64
 }
 
+// NewBlockIter receives a block and return Iter for it.
 func NewBlockIter(block *Block) *Iter {
 	return &Iter{
 		block: block,
@@ -21,26 +23,31 @@ func NewBlockIter(block *Block) *Iter {
 	}
 }
 
+// NewBlockIterAndSeekToFirst receives a block, create a Iter, seek to first key, return it.
 func NewBlockIterAndSeekToFirst(block *Block) *Iter {
 	i := NewBlockIter(block)
 	i.SeekTo(0)
 	return i
 }
 
+// NewBlockIterAndSeekToKey receives a block, create a Iter, seek to specified key, return it.
 func NewBlockIterAndSeekToKey(block *Block, key []byte) *Iter {
 	i := NewBlockIter(block)
 	i.SeekToKey(key)
 	return i
 }
 
+// IsValid checks that whether Iter valid
 func (b *Iter) IsValid() bool {
 	return b.block != nil && len(b.key) != 0
 }
 
+// SeekToFirst help Iter to seek to first key
 func (b *Iter) SeekToFirst() {
 	b.SeekTo(0)
 }
 
+// Key get key for current pos
 func (b *Iter) Key() []byte {
 	if len(b.key) == 0 {
 		panic("invalid iterator")
@@ -52,6 +59,7 @@ func (b *Iter) Key() []byte {
 	return b.key
 }
 
+// Value get value for current pos
 func (b *Iter) Value() []byte {
 	if len(b.key) == 0 {
 		panic("invalid iterator")
@@ -63,6 +71,7 @@ func (b *Iter) Value() []byte {
 	return b.value
 }
 
+// SeekTo receives an index, then try to seek to key-value pair on this index.
 func (b *Iter) SeekTo(idx uint64) {
 	if b.block == nil {
 		return
@@ -77,6 +86,7 @@ func (b *Iter) SeekTo(idx uint64) {
 	b.idx = idx
 }
 
+// Next make iter turn to next key-value pair
 func (b *Iter) Next() {
 	if b.block == nil {
 		return
@@ -85,6 +95,7 @@ func (b *Iter) Next() {
 	b.SeekTo(b.idx)
 }
 
+// SeekToKey make iter to find key in dichotomy.
 func (b *Iter) SeekToKey(key []byte) {
 	if b.block == nil {
 		return

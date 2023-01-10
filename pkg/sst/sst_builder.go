@@ -3,18 +3,27 @@ package sst
 import (
 	"encoding/binary"
 	"os"
-	"reflect"
 	"sync"
-	"unsafe"
 
 	"github.com/dashjay/mini-lsm-go/pkg/block"
 )
 
+// TableBuilder can build sst
+// 3. save meta for block to metas
 type TableBuilder struct {
-	builder   *block.Builder
-	firstKey  []byte
-	data      []byte
-	metas     []*block.Meta
+	// builder is current Block Builder
+	builder *block.Builder
+
+	// firstKey: save firstKey for every Block
+	firstKey []byte
+
+	// data: append encoded Block to
+	data []byte
+
+	// metas saves every meta for built Block
+	metas []*block.Meta
+
+	// blockSize is size of every Block
 	blockSize uint64
 }
 
@@ -24,6 +33,7 @@ func keyDeepcopy(key []byte) []byte {
 	return out
 }
 
+// NewTableBuilder recieve max blockSize and return a TableBuilder
 func NewTableBuilder(blockSize uint64) *TableBuilder {
 	return &TableBuilder{
 		builder:   block.NewBlockBuilder(blockSize),
@@ -32,6 +42,8 @@ func NewTableBuilder(blockSize uint64) *TableBuilder {
 	}
 }
 
+// Add receives a pair of key value(string), if builder has been full, we'll close
+// current block, create new Block then add key-value to it.
 func (t *TableBuilder) Add(key, value string) {
 	if t.firstKey == nil {
 		t.firstKey = []byte(key)
@@ -46,6 +58,8 @@ func (t *TableBuilder) Add(key, value string) {
 	t.firstKey = []byte(key)
 }
 
+// Add receives a pair of key value([]byte), if builder has been full, we'll close
+// current block, create new Block then add key-value to it.
 func (t *TableBuilder) AddByte(key, value []byte) {
 	if t.firstKey == nil {
 		t.firstKey = keyDeepcopy(key)
@@ -61,6 +75,9 @@ func (t *TableBuilder) AddByte(key, value []byte) {
 	t.firstKey = keyDeepcopy(key)
 }
 
+// Build build sst with all built block
+// WARNING: after Build calling
+// the data in TableBuilder is dirty(other metadata was appended to it)
 func (t *TableBuilder) Build(id uint32, cache sync.Map, path string) (*Table, error) {
 	t.finishBlock()
 	buf := t.data
@@ -97,14 +114,4 @@ func (t *TableBuilder) finishBlock() {
 		FirstKey: keyDeepcopy(t.firstKey),
 	})
 	t.data = append(t.data, encodedBlock...)
-}
-
-func s2b(s string) []byte {
-	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bh := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&bh))
 }

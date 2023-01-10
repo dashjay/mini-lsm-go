@@ -69,7 +69,8 @@ func generateSST(getTempDir func() string) (*sst.Table, string) {
 }
 
 func TestGenerateSST(t *testing.T) {
-	generateSST(t.TempDir)
+	st, _ := generateSST(t.TempDir)
+	assert.Nil(t, st.Close())
 }
 
 func TestSSTDecode(t *testing.T) {
@@ -79,10 +80,13 @@ func TestSSTDecode(t *testing.T) {
 	nsstable, err := sst.OpenTableFromFile(0, sync.Map{}, fd)
 	assert.Nil(t, err)
 	assert.Equal(t, sstable.Meta(), nsstable.Meta())
+	assert.Nil(t, sstable.Close())
+	assert.Nil(t, nsstable.Close())
 }
 
 func TestSSTIter(t *testing.T) {
 	sstable, _ := generateSST(t.TempDir)
+	defer sstable.Close()
 	iter := sst.NewIterAndSeekToFirst(sstable)
 	for i := 0; i < 5; i++ {
 		for j := uint64(0); j < 100; j++ {
@@ -98,15 +102,18 @@ func TestSSTIter(t *testing.T) {
 
 func BenchmarkSSTEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		generateSST(b.TempDir)
+		table, _ := generateSST(b.TempDir)
+		table.Close()
 	}
 }
 
 func BenchmarkSSTDecode(b *testing.B) {
-	_, fp := generateSST(b.TempDir)
+	st, fp := generateSST(b.TempDir)
+	st.Close()
 	for i := 0; i < b.N; i++ {
 		fd, _ := os.Open(fp)
-		sst.OpenTableFromFile(0, sync.Map{}, fd)
+		tb, _ := sst.OpenTableFromFile(0, sync.Map{}, fd)
+		tb.Close()
 	}
 }
 
@@ -118,4 +125,5 @@ func BenchmarkSSTIter(b *testing.B) {
 			iter.Next()
 		}
 	}
+	sstable.Close()
 }

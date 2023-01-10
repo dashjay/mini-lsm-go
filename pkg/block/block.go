@@ -14,6 +14,7 @@ type Block struct {
 	offsets []uint16
 }
 
+// Encode Block to []byte
 func (b *Block) Encode() []byte {
 	var buf = make([]byte, 0, uint64(len(b.offsets))*SizeOfUint16+uint64(len(b.data))+SizeOfUint16)
 	buf = append(buf, b.data...)
@@ -26,6 +27,7 @@ func (b *Block) Encode() []byte {
 	return buf
 }
 
+// Decode decode Block from []byte
 func (b *Block) Decode(in []byte) {
 	offsets_len := binary.BigEndian.Uint16(in[len(in)-SizeOfUint16:])
 	dataEnd := len(in) - SizeOfUint16 - int(offsets_len)*SizeOfUint16

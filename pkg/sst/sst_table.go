@@ -43,6 +43,10 @@ func OpenTableFromFile(id uint32, blockCache sync.Map, fd *os.File) (*Table, err
 	}, err
 }
 
+func (t *Table) Close() error {
+	return t.fd.Close()
+}
+
 func (t *Table) ReadBlock(blockIdx uint32) (*block.Block, error) {
 	offset := t.metas[blockIdx].Offset
 	var offsetEnd uint32
