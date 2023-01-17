@@ -18,6 +18,11 @@ func NewIterAndSeekToFirst(table *Table) *Iter {
 	return &Iter{table: table, blkIter: blkIter, blkIdx: 0}
 }
 
+func NewIterAndSeekToKey(table *Table, key []byte) *Iter {
+	blkIdx, iter := seekToKey(table, key)
+	return &Iter{table: table, blkIter: iter, blkIdx: blkIdx}
+}
+
 func (i *Iter) SeekToFirst() (err error) {
 	i.blkIdx = 0
 	i.blkIter = block.NewBlockIterAndSeekToFirst(i.table.ReadBlockCached(0))

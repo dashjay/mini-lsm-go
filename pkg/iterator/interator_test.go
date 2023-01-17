@@ -131,6 +131,6 @@ func TestMerge2(t *testing.T) {
 		{[]byte("a"), []byte("1.2")},
 		{[]byte("b"), []byte("2.3")},
 		{[]byte("c"), []byte("3.3")},
-		{[]byte("d"), []byte("4.4")},
+		{[]byte("d"), []byte("4.3")},
 	})
 }
