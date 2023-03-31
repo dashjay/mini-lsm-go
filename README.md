@@ -1,2 +1,2 @@
 # mini-lsm-go
-translate skyzh/mini-lsm to go version
+After learning skyzh/mini-lsm, write a go version

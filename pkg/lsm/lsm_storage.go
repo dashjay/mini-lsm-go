@@ -105,12 +105,16 @@ func (s *Storage) Sync() error {
 	oldMemtable := s.inner.memt
 	flushMemtable := oldMemtable
 
+	// 2. replace it with a new memtable
 	s.inner.memt = newMemtable
 
 	sstId := s.inner.nextSSTID
+
+	// 3. append memtable to immemtable
 	s.inner.immMemt = append(s.inner.immMemt, oldMemtable)
 	s.mu.Unlock()
 
+	// 4. flush memtable to a new table builder
 	builder := sst.NewTableBuilder(4096)
 	flushMemtable.Flush(builder)
 

@@ -6,6 +6,7 @@ import (
 )
 
 // Iter can hold an Block, for iterating it one-by-one.
+// keys in Iter should be sorted
 type Iter struct {
 	block *Block
 	key   []byte

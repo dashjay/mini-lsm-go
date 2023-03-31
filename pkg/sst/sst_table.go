@@ -14,9 +14,15 @@ import (
 
 var ErrReadBlockError = errors.New("read block error")
 
+// Table is a sorted string table
 type Table struct {
+	// fd hold the open file
 	fd          *os.File
+
+	// all metas, hold block offset and first key
 	metas       []*block.Meta
+	
+	// metaOffsets 
 	metaOffsets uint32
 	id          uint32
 
@@ -29,11 +35,19 @@ func OpenTableFromFile(id uint32, blockCache sync.Map, fd *os.File) (*Table, err
 	if err != nil {
 		return nil, err
 	}
+	// read metaoffset(last block.SizeOfUint32 byte)
 	var rawMetaOffset [block.SizeOfUint32]byte
 	fd.ReadAt(rawMetaOffset[:], fi.Size()-block.SizeOfUint32)
 	blockMetaOffset := binary.BigEndian.Uint32(rawMetaOffset[:])
+
+	// seek to offset for reading metadata
 	fd.Seek(int64(blockMetaOffset), io.SeekStart)
-	rawMetas, err := block.DecodeBlockMetaFromReader(io.LimitReader(fd, fi.Size()-4-int64(blockMetaOffset)))
+	
+	// sst: | blocks | block_metadata{offset, firstkey} | metadata_offset |
+	rawMetas, err := block.DecodeBlockMetaFromReader(io.LimitReader(fd, fi.Size()- block.SizeOfUint32 -int64(blockMetaOffset)))
+	if err != nil{
+		return nil, err
+	}
 	return &Table{
 		fd:          fd,
 		metas:       rawMetas,
@@ -69,7 +83,8 @@ func (t *Table) ReadBlock(blockIdx uint32) (*block.Block, error) {
 }
 
 func (t *Table) ReadBlockCached(blockIdx uint32) *block.Block {
-	if v, ok := t.blockCache.Load([2]uint32{t.id, blockIdx}); ok {
+	key := [2]uint32{t.id, blockIdx}
+	if v, ok := t.blockCache.Load(key); ok {
 		return v.(*block.Block)
 	}
 	blk, err := t.ReadBlock(blockIdx)
@@ -77,7 +92,7 @@ func (t *Table) ReadBlockCached(blockIdx uint32) *block.Block {
 		log.Printf("ReadBlock error: %s", err)
 		return nil
 	}
-	t.blockCache.Store([2]uint32{t.id, blockIdx}, blk)
+	t.blockCache.Store(key, blk)
 	return blk
 }
 
