@@ -66,7 +66,7 @@ func (m *MemTableIterator) Key() []byte {
 	return inlineDeepcopy(m.ele.Key().([]byte))
 }
 
-func (m *MemTableIterator) IsValue() bool {
+func (m *MemTableIterator) IsValid() bool {
 	return m.ele != nil && len(m.ele.Key().([]byte)) != 0
 }
 

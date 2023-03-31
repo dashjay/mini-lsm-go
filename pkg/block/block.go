@@ -29,8 +29,10 @@ func (b *Block) Encode() []byte {
 
 // Decode decode Block from []byte
 func (b *Block) Decode(in []byte) {
+	// block: | data | offsets(->) | offsets_len(2Byte) |
 	offsets_len := binary.BigEndian.Uint16(in[len(in)-SizeOfUint16:])
-	dataEnd := len(in) - SizeOfUint16 - int(offsets_len)*SizeOfUint16
+	dataEnd := len(in) - int(offsets_len)*SizeOfUint16 - SizeOfUint16
+
 	offsetRaw := in[dataEnd : len(in)-SizeOfUint16]
 	b.offsets = make([]uint16, offsets_len)
 	for i := uint16(0); i < offsets_len; i++ {
