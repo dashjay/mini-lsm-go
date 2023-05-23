@@ -42,7 +42,10 @@ func (t *Table) Scan(lower, upper []byte) *MemTableIterator {
 }
 
 func (t *Table) Flush(builder *sst.TableBuilder) {
-	head := t.m.Element()
+	head := t.m.Front()
+	if head == nil {
+		return
+	}
 	for {
 		builder.AddByte(head.Key().([]byte), head.Value.([]byte))
 		next := head.Next()

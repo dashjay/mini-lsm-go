@@ -2,6 +2,8 @@ package lsm
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"sync"
 
 	"github.com/dashjay/mini-lsm-go/pkg/iterator"
@@ -57,7 +59,6 @@ func (s *Storage) Get(key []byte) []byte {
 			return val
 		}
 	}
-
 	iters := make([]iterator.Iter, 0, len(s.inner.l0SSTables))
 	for t := range s.inner.l0SSTables {
 		iters = append(iters, sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], key))
@@ -77,7 +78,7 @@ func (s *Storage) Put(key, value []byte) {
 		panic("key cannot be empty")
 	}
 	s.mu.RLock()
-	defer s.mu.RLock()
+	defer s.mu.RUnlock()
 	s.inner.memt.Put(key, value)
 }
 
@@ -99,9 +100,9 @@ func (s *Storage) Sync() error {
 	defer s.flushLock.Unlock()
 
 	// 1. mark mmtable as imm_mmtable
-	s.mu.Lock()
 	newMemtable := memtable.NewTable()
 
+	s.mu.Lock()
 	oldMemtable := s.inner.memt
 	flushMemtable := oldMemtable
 
@@ -118,17 +119,90 @@ func (s *Storage) Sync() error {
 	builder := sst.NewTableBuilder(4096)
 	flushMemtable.Flush(builder)
 
-	sst, err := builder.Build(sstId, s.blockCache, s.sstPath(sstId))
+	sstable, err := builder.Build(sstId, s.blockCache, s.sstPath(sstId))
 	if err != nil {
 		return err
 	}
 
 	s.inner.immMemt = s.inner.immMemt[:len(s.inner.immMemt)-1]
-	s.inner.l0SSTables = append(s.inner.l0SSTables, sst)
+	s.inner.l0SSTables = append([]*sst.Table{sstable}, s.inner.l0SSTables...)
 	s.inner.nextSSTID += 1
 	return nil
 }
 
-func (s *Storage) Scan(lower, upper []byte) {
+func (s *Storage) Scan(lower, upper []byte) iterator.Iter {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var iters []iterator.Iter
+	memtScan := s.inner.memt.Scan(lower, upper)
+	if memtScan.IsValid() {
+		log.Printf("memtScan: %s", memtScan.Key())
+	}
+	iters = append(iters, memtScan)
+
+	for _, mt := range s.inner.immMemt {
+		imemtScan := mt.Scan(lower, upper)
+		if imemtScan.IsValid() {
+			log.Printf("imemTable: %s", imemtScan.Key())
+		}
+		iters = append(iters, mt.Scan(lower, upper))
+	}
+
+	for t := range s.inner.l0SSTables {
+		iters = append(iters, sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], lower))
+	}
+	for i := range iters {
+		if iters[i].IsValid() {
+			log.Printf("iter first key: %s\n", iters[i].Key())
+		}
+	}
+	return iterator.NewmergeIterator(iters...)
+}
+
+func (s *Storage) Compact() {
+	log.Printf("compact with l0SSTables: %d", len(s.inner.l0SSTables))
+	if len(s.inner.l0SSTables) >= 2 {
+		s.mu.RLock()
+		l0SSTableLength := len(s.inner.l0SSTables)
+		sn := s.inner.l0SSTables[l0SSTableLength-1]
+		snID := sn.SSTID()
+		snm1 := s.inner.l0SSTables[l0SSTableLength-2]
+		snm1ID := snm1.SSTID()
+		s.mu.RUnlock()
+
+		snIter := sst.NewIterAndSeekToFirst(sn)
+		snm1Iter := sst.NewIterAndSeekToFirst(snm1)
+		mergeIter := iterator.NewTwoMerger(snm1Iter, snIter)
+		builder := sst.NewTableBuilder(4096)
+		for mergeIter.IsValid() {
+			builder.AddByte(mergeIter.Key(), mergeIter.Value())
+			mergeIter.Next()
+		}
+		sstId := s.inner.nextSSTID
+		sstable, err := builder.Build(sstId, s.blockCache, s.sstPath(sstId))
+		if err != nil {
+			log.Printf("sstable build fail: %s", err)
+		}
+		s.mu.Lock()
+		defer func() {
+			snm1.Close()
+			sn.Close()
+			os.Remove(s.sstPath(snID))
+			os.Remove(s.sstPath(snm1ID))
+		}()
+		if s.inner.l0SSTables[l0SSTableLength-1].SSTID() == snID &&
+			s.inner.l0SSTables[l0SSTableLength-2].SSTID() == snm1ID {
+			for _, sst := range s.inner.l0SSTables {
+				log.Printf("sst: %d\n", sst.SSTID())
+			}
+			log.Println()
+			s.inner.l0SSTables = append(s.inner.l0SSTables[:l0SSTableLength-2], sstable)
+			for _, sst := range s.inner.l0SSTables {
+				log.Printf("sst: %d\n", sst.SSTID())
+			}
+			log.Println()
+		}
+		s.mu.Unlock()
+	}
 
 }

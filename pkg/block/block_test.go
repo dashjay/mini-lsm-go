@@ -132,61 +132,65 @@ func TestBlockMeta(t *testing.T) {
 	})
 }
 
-func BenchmarkBlockEncode(b *testing.B) {
-	count := 1000
-
-	bb := block.NewBlockBuilder(65535)
-	for i := 0; i < count; i++ {
+func newBlock(blockSize uint64, keyCount int) *block.Block {
+	bb := block.NewBlockBuilder(blockSize)
+	for i := 0; i < keyCount; i++ {
 		bb.Add(fmt.Sprintf("key-%d", i), fmt.Sprintf("value-%d", i))
 	}
+	return bb.Build()
+}
 
-	b.StartTimer()
+func newBlockIter(blockSize uint64, keyCount int) *block.Iter {
+	return block.NewBlockIter(newBlock(blockSize, keyCount))
+}
+
+func BenchmarkBlockEncode(b *testing.B) {
+	block := newBlock(655350, 10000)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = bb.Build().Encode()
+		_ = block.Encode()
 	}
-	b.StopTimer()
 }
 
 func BenchmarkBlockDecode(b *testing.B) {
-	count := 1000
-
-	bb := block.NewBlockBuilder(65535)
-	for i := 0; i < count; i++ {
-		bb.Add(fmt.Sprintf("key-%d", i), fmt.Sprintf("value-%d", i))
-	}
-	blockByte := bb.Build().Encode()
-
-	var blk = &block.Block{}
-	b.StartTimer()
+	blk := newBlock(655350, 10000)
+	blockByte := blk.Encode()
+	var emptyBlock = &block.Block{}
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		blk.Decode(blockByte)
+		emptyBlock.Decode(blockByte)
 	}
-	b.StopTimer()
+}
+
+func BenchmarkBlockBuild(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		newBlockIter(512*1024, 10000)
+	}
 }
 
 func BenchmarkBlockIter(b *testing.B) {
 	count := 1000
-
-	bb := block.NewBlockBuilder(65535)
-	for i := 0; i < count; i++ {
-		bb.Add(fmt.Sprintf("key-%d", i), fmt.Sprintf("value-%d", i))
-	}
-	iter := block.NewBlockIter(bb.Build())
+	iter := newBlockIter(65535, count)
 
 	b.Run("test seek to idx", func(b *testing.B) {
-		idx := rand.Uint64() % uint64(count)
-		iter.SeekTo(idx)
+		for i := 0; i < b.N; i++ {
+			iter.SeekTo(uint64(i) % uint64(count))
+		}
 	})
 
 	b.Run("test seek to key exists", func(b *testing.B) {
-		idx := rand.Uint64() % uint64(count)
-		key := s2b(fmt.Sprintf("key-%d", idx))
-		iter.SeekToKey(key)
+		for i := 0; i < b.N; i++ {
+			idx := uint64(i) % uint64(count)
+			key := s2b(fmt.Sprintf("key-%d", idx))
+			iter.SeekToKey(key)
+		}
 	})
 
 	b.Run("test seek to key not exists", func(b *testing.B) {
-		idx := rand.Uint64()%uint64(count) + uint64(count)
-		keyNotExists := s2b(fmt.Sprintf("key-%d", idx))
-		iter.SeekToKey(keyNotExists)
+		for i := 0; i < b.N; i++ {
+			idx := uint64(i)%uint64(count) + uint64(count)
+			keyNotExists := s2b(fmt.Sprintf("key-%d", idx))
+			iter.SeekToKey(keyNotExists)
+		}
 	})
 }

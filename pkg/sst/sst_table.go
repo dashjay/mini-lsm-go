@@ -17,12 +17,12 @@ var ErrReadBlockError = errors.New("read block error")
 // Table is a sorted string table
 type Table struct {
 	// fd hold the open file
-	fd          *os.File
+	fd *os.File
 
 	// all metas, hold block offset and first key
-	metas       []*block.Meta
-	
-	// metaOffsets 
+	metas []*block.Meta
+
+	// metaOffsets
 	metaOffsets uint32
 	id          uint32
 
@@ -42,10 +42,10 @@ func OpenTableFromFile(id uint32, blockCache sync.Map, fd *os.File) (*Table, err
 
 	// seek to offset for reading metadata
 	fd.Seek(int64(blockMetaOffset), io.SeekStart)
-	
+
 	// sst: | blocks | block_metadata{offset, firstkey} | metadata_offset |
-	rawMetas, err := block.DecodeBlockMetaFromReader(io.LimitReader(fd, fi.Size()- block.SizeOfUint32 -int64(blockMetaOffset)))
-	if err != nil{
+	rawMetas, err := block.DecodeBlockMetaFromReader(io.LimitReader(fd, fi.Size()-block.SizeOfUint32-int64(blockMetaOffset)))
+	if err != nil {
 		return nil, err
 	}
 	return &Table{
@@ -118,4 +118,8 @@ func (t *Table) Len() uint32 {
 
 func (t *Table) Meta() []*block.Meta {
 	return t.metas
+}
+
+func (t *Table) SSTID() uint32 {
+	return t.id
 }
