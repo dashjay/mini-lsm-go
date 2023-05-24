@@ -64,7 +64,7 @@ func (s *Storage) Get(key []byte) []byte {
 	for t := range s.inner.l0SSTables {
 		iters = append(iters, sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], key))
 	}
-	iter := iterator.NewmergeIterator(iters...)
+	iter := iterator.NewMergeIterator(iters...)
 	if iter.IsValid() {
 		return iter.Key()
 	}
@@ -140,7 +140,7 @@ func (s *Storage) DebugScan(lower, upper []byte) iterator.Iter {
 		iters = append(iters, sstIter)
 	}
 
-	return iterator.NewmergeIterator(iters...)
+	return iterator.NewMergeIterator(iters...)
 }
 
 func (s *Storage) Scan(lower, upper []byte) iterator.Iter {
@@ -157,7 +157,7 @@ func (s *Storage) Scan(lower, upper []byte) iterator.Iter {
 	for t := range s.inner.l0SSTables {
 		iters = append(iters, sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], lower))
 	}
-	return iterator.NewmergeIterator(iters...)
+	return iterator.NewMergeIterator(iters...)
 }
 
 func (s *Storage) Compact() {

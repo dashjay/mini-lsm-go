@@ -1,15 +1,14 @@
 package sst_test
 
 import (
-	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 	"testing"
-	"unsafe"
 
 	"github.com/dashjay/mini-lsm-go/pkg/sst"
+	"github.com/dashjay/mini-lsm-go/pkg/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,45 +35,14 @@ func TestBuildSSTTowBlocks(t *testing.T) {
 	assert.NotNil(t, sstable)
 }
 
-func s2b(s string) []byte {
-	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bh := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&bh))
-}
-
-func KeyOf(idx uint64) []byte {
-	return s2b(fmt.Sprintf("key_%0*d", 8, idx))
-}
-
-func ValueOf(idx uint64) []byte {
-	return s2b(fmt.Sprintf("value_%0*d", 8, idx))
-}
-
-func generateSST(tempdirFn func() string) (*sst.Table, string, error) {
-
-	tb := sst.NewTableBuilder(4096)
-	for idx := uint64(0); idx < 1000; idx++ {
-		key, value := KeyOf(idx), ValueOf(idx)
-		tb.AddByte(key, value)
-	}
-	tempdir := tempdirFn()
-	fp := filepath.Join(tempdir, "1.sst")
-	sstable, err := tb.Build(1, sync.Map{}, fp)
-	return sstable, fp, err
-}
-
 func TestGenerateSST(t *testing.T) {
-	st, _, err := generateSST(t.TempDir)
+	st, _, err := test.GenerateSST(t.TempDir, 1000)
 	assert.Nil(t, err)
 	assert.Nil(t, st.Close())
 }
 
 func TestSSTDecode(t *testing.T) {
-	sstable, fp, err := generateSST(t.TempDir)
+	sstable, fp, err := test.GenerateSST(t.TempDir, 1000)
 	assert.Nil(t, err)
 	fd, err := os.Open(fp)
 	assert.Nil(t, err)
@@ -85,8 +53,8 @@ func TestSSTDecode(t *testing.T) {
 	assert.Nil(t, nsstable.Close())
 }
 
-func TestSSTIter(t *testing.T) {
-	sstable, _, err := generateSST(t.TempDir)
+func TestSSTIterSeekToFirst(t *testing.T) {
+	sstable, _, err := test.GenerateSST(t.TempDir, 1000)
 	assert.Nil(t, err)
 	defer sstable.Close()
 	iter := sst.NewIterAndSeekToFirst(sstable)
@@ -94,23 +62,38 @@ func TestSSTIter(t *testing.T) {
 		for j := uint64(0); j < 100; j++ {
 			key := iter.Key()
 			value := iter.Value()
-			assert.Equalf(t, KeyOf(j), key, "expect key %s, actual key: %s", KeyOf(j), key)
-			assert.Equalf(t, ValueOf(j), value, "expect key %s, actual key: %s", ValueOf(j), value)
+			assert.Equalf(t, test.KeyOf(j), key, "expect key %s, actual key: %s", test.KeyOf(j), key)
+			assert.Equalf(t, test.ValueOf(j), value, "expect value %s, actual value: %s", test.ValueOf(j), value)
 			iter.Next()
 		}
 		iter.SeekToFirst()
 	}
 }
 
+func TestSSTIterSeekToKey(t *testing.T) {
+	sstable, _, err := test.GenerateSST(t.TempDir, 1000)
+	assert.Nil(t, err)
+	defer sstable.Close()
+	iter := sst.NewIterAndSeekToFirst(sstable)
+	for i := 0; i < 5; i++ {
+		idx := rand.Uint64() % 1000
+		iter.SeekToKey(test.KeyOf(idx))
+		key := iter.Key()
+		value := iter.Value()
+		assert.Equalf(t, test.KeyOf(idx), key, "expect key %s, actual key: %s", test.KeyOf(idx), key)
+		assert.Equalf(t, test.ValueOf(idx), value, "expect value %s, actual value: %s", test.ValueOf(idx), value)
+	}
+}
+
 func BenchmarkSSTEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		table, _, _ := generateSST(b.TempDir)
+		table, _, _ := test.GenerateSST(b.TempDir, 1000)
 		table.Close()
 	}
 }
 
 func BenchmarkSSTDecode(b *testing.B) {
-	st, fp, _ := generateSST(b.TempDir)
+	st, fp, _ := test.GenerateSST(b.TempDir, 1000)
 	st.Close()
 	for i := 0; i < b.N; i++ {
 		fd, _ := os.Open(fp)
@@ -120,7 +103,7 @@ func BenchmarkSSTDecode(b *testing.B) {
 }
 
 func BenchmarkSSTIterSeekToFirst(b *testing.B) {
-	sstable, _, _ := generateSST(b.TempDir)
+	sstable, _, _ := test.GenerateSST(b.TempDir, 1000)
 	iter := sst.NewIterAndSeekToFirst(sstable)
 	for i := 0; i < b.N; i++ {
 		for j := uint64(0); j < 100; j++ {
@@ -131,24 +114,24 @@ func BenchmarkSSTIterSeekToFirst(b *testing.B) {
 }
 
 func BenchmarkSSTIterSeekToKeyExists(b *testing.B) {
-	sstable, _, _ := generateSST(b.TempDir)
+	sstable, _, _ := test.GenerateSST(b.TempDir, 1000)
 	iter := sst.NewIterAndSeekToFirst(sstable)
 	for i := 0; i < b.N; i++ {
 		for j := uint64(0); j < 100; j++ {
 			iter.SeekToFirst()
-			iter.SeekToKey(KeyOf(j))
+			iter.SeekToKey(test.KeyOf(j))
 		}
 	}
 	sstable.Close()
 }
 
 func BenchmarkSSTIterSeekToKeyNonExists(b *testing.B) {
-	sstable, _, _ := generateSST(b.TempDir)
+	sstable, _, _ := test.GenerateSST(b.TempDir, 1000)
 	iter := sst.NewIterAndSeekToFirst(sstable)
 	for i := 0; i < b.N; i++ {
 		for j := uint64(0); j < 100; j++ {
 			iter.SeekToFirst()
-			iter.SeekToKey(KeyOf(j + 10086))
+			iter.SeekToKey(test.KeyOf(j + 10086))
 		}
 	}
 	sstable.Close()

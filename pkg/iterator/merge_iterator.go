@@ -4,12 +4,17 @@ import (
 	"bytes"
 )
 
+// MergeIterator can merge many iters to one
+// all different key will remain
+// if there are same keys, will take iter which index is small
 type MergeIterator struct {
 	iters   []Iter
 	current int
 }
 
-func NewmergeIterator(in ...Iter) *MergeIterator {
+// NewMergeIterator receives one or more iters
+// return a MergeIterator
+func NewMergeIterator(in ...Iter) *MergeIterator {
 	if len(in) == 0 {
 		return &MergeIterator{iters: in, current: -1}
 	}
@@ -26,10 +31,9 @@ func NewmergeIterator(in ...Iter) *MergeIterator {
 }
 
 func findMinimalIter(iters []Iter) int {
-	// we need to find the least key(the first for duplicate keys)
+	// every iter is valid, we want to find the smallest key
 	min := 0
 	for i := 1; i < len(iters); i++ {
-		// min.key > i.key
 		if bytes.Compare(iters[min].Key(), iters[i].Key()) == 1 {
 			min = i
 		}
@@ -49,26 +53,28 @@ func (m *MergeIterator) IsValid() bool {
 	return m.current >= 0 && m.current < len(m.iters) && m.iters[m.current].IsValid()
 }
 
+// Next should skip all same key in every ite
 func (m *MergeIterator) Next() {
-	currentKey := m.iters[m.current].Key()
+	currentKey := make([]byte, len(m.iters[m.current].Key()))
+	copy(currentKey, m.iters[m.current].Key())
 
-	// 1. check iter for current ptr
+	// 1. move current iter to next
 	m.iters[m.current].Next()
-	if !m.iters[m.current].IsValid() {
+	if m.iters[m.current].IsValid() == false {
 		m.iters = append(m.iters[:m.current], m.iters[m.current+1:]...)
 	}
 
 	// 2. remove all dup keys
 	for i := 0; i < len(m.iters); i++ {
-		if bytes.Equal(m.iters[i].Key(), currentKey) {
+		for m.iters[i].IsValid() && bytes.Equal(m.iters[i].Key(), currentKey) {
 			m.iters[i].Next()
 		}
 	}
 
-	// 3. remove all invalid
+	// 3. remove all invalid iter
 	i := len(m.iters) - 1
 	for i >= 0 {
-		if !m.iters[i].IsValid() {
+		if m.iters[i].IsValid() == false {
 			m.iters = append(m.iters[:i], m.iters[i+1:]...)
 		}
 		i--
