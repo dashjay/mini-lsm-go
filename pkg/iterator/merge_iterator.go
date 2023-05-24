@@ -1,6 +1,9 @@
 package iterator
 
-import "bytes"
+import (
+	"bytes"
+	"log"
+)
 
 type MergeIterator struct {
 	iters   []Iter
@@ -14,12 +17,15 @@ func NewmergeIterator(in ...Iter) *MergeIterator {
 
 	iters := make([]Iter, 0)
 	for i := range in {
-		if !in[i].IsValid() {
+		if in[i].IsValid() == false {
 			continue
 		}
 		iters = append(iters, in[i])
 	}
 
+	for i := range iters {
+		log.Printf("%d, NewmergeIterator, next: %s", i, iters[i].Key())
+	}
 	return &MergeIterator{iters: iters, current: findMinimalIter(iters)}
 }
 

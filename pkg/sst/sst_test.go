@@ -17,7 +17,8 @@ func TestBuildSSTSingleKey(t *testing.T) {
 	tb := sst.NewTableBuilder(16)
 	tb.Add("233", "233333")
 	tempdir := t.TempDir()
-	tb.Build(0, sync.Map{}, filepath.Join(tempdir, "1.sst"))
+	_, err := tb.Build(0, sync.Map{}, filepath.Join(tempdir, "1.sst"))
+	assert.Nil(t, err)
 }
 
 func TestBuildSSTTowBlocks(t *testing.T) {
@@ -46,35 +47,35 @@ func s2b(s string) []byte {
 }
 
 func KeyOf(idx uint64) []byte {
-	return s2b(fmt.Sprintf("key_%d", idx))
+	return s2b(fmt.Sprintf("key_%0*d", 8, idx))
 }
 
 func ValueOf(idx uint64) []byte {
-	return s2b(fmt.Sprintf("value_%d", idx))
+	return s2b(fmt.Sprintf("value_%0*d", 8, idx))
 }
 
-func generateSST(getTempDir func() string) (*sst.Table, string) {
-	tb := sst.NewTableBuilder(128)
-	for idx := uint64(0); idx < 100; idx++ {
+func generateSST(tempdirFn func() string) (*sst.Table, string, error) {
+
+	tb := sst.NewTableBuilder(4096)
+	for idx := uint64(0); idx < 1000; idx++ {
 		key, value := KeyOf(idx), ValueOf(idx)
 		tb.AddByte(key, value)
 	}
-	tempdir := getTempDir()
+	tempdir := tempdirFn()
 	fp := filepath.Join(tempdir, "1.sst")
-	sstable, err := tb.Build(0, sync.Map{}, fp)
-	if err != nil {
-		panic(err)
-	}
-	return sstable, fp
+	sstable, err := tb.Build(1, sync.Map{}, fp)
+	return sstable, fp, err
 }
 
 func TestGenerateSST(t *testing.T) {
-	st, _ := generateSST(t.TempDir)
+	st, _, err := generateSST(t.TempDir)
+	assert.Nil(t, err)
 	assert.Nil(t, st.Close())
 }
 
 func TestSSTDecode(t *testing.T) {
-	sstable, fp := generateSST(t.TempDir)
+	sstable, fp, err := generateSST(t.TempDir)
+	assert.Nil(t, err)
 	fd, err := os.Open(fp)
 	assert.Nil(t, err)
 	nsstable, err := sst.OpenTableFromFile(0, sync.Map{}, fd)
@@ -85,7 +86,8 @@ func TestSSTDecode(t *testing.T) {
 }
 
 func TestSSTIter(t *testing.T) {
-	sstable, _ := generateSST(t.TempDir)
+	sstable, _, err := generateSST(t.TempDir)
+	assert.Nil(t, err)
 	defer sstable.Close()
 	iter := sst.NewIterAndSeekToFirst(sstable)
 	for i := 0; i < 5; i++ {
@@ -102,13 +104,13 @@ func TestSSTIter(t *testing.T) {
 
 func BenchmarkSSTEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		table, _ := generateSST(b.TempDir)
+		table, _, _ := generateSST(b.TempDir)
 		table.Close()
 	}
 }
 
 func BenchmarkSSTDecode(b *testing.B) {
-	st, fp := generateSST(b.TempDir)
+	st, fp, _ := generateSST(b.TempDir)
 	st.Close()
 	for i := 0; i < b.N; i++ {
 		fd, _ := os.Open(fp)
@@ -117,12 +119,36 @@ func BenchmarkSSTDecode(b *testing.B) {
 	}
 }
 
-func BenchmarkSSTIter(b *testing.B) {
-	sstable, _ := generateSST(b.TempDir)
+func BenchmarkSSTIterSeekToFirst(b *testing.B) {
+	sstable, _, _ := generateSST(b.TempDir)
 	iter := sst.NewIterAndSeekToFirst(sstable)
 	for i := 0; i < b.N; i++ {
 		for j := uint64(0); j < 100; j++ {
 			iter.Next()
+		}
+	}
+	sstable.Close()
+}
+
+func BenchmarkSSTIterSeekToKeyExists(b *testing.B) {
+	sstable, _, _ := generateSST(b.TempDir)
+	iter := sst.NewIterAndSeekToFirst(sstable)
+	for i := 0; i < b.N; i++ {
+		for j := uint64(0); j < 100; j++ {
+			iter.SeekToFirst()
+			iter.SeekToKey(KeyOf(j))
+		}
+	}
+	sstable.Close()
+}
+
+func BenchmarkSSTIterSeekToKeyNonExists(b *testing.B) {
+	sstable, _, _ := generateSST(b.TempDir)
+	iter := sst.NewIterAndSeekToFirst(sstable)
+	for i := 0; i < b.N; i++ {
+		for j := uint64(0); j < 100; j++ {
+			iter.SeekToFirst()
+			iter.SeekToKey(KeyOf(j + 10086))
 		}
 	}
 	sstable.Close()

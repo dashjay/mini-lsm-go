@@ -96,27 +96,19 @@ func (s *Storage) sstPath(id uint32) string {
 	return filepath.Join(s.path, fmt.Sprintf("%d.sst", id))
 }
 
-func (s *Storage) Sync() error {
+func (s *Storage) MakeNewMemtable() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inner.memt, s.inner.immMemt = memtable.NewTable(), append(s.inner.immMemt, s.inner.memt)
+}
+
+func (s *Storage) SinkImemtableToSST() error {
 	s.flushLock.Lock()
 	defer s.flushLock.Unlock()
-
-	// 1. mark mmtable as imm_mmtable
-	newMemtable := memtable.NewTable()
-
-	s.mu.Lock()
-	oldMemtable := s.inner.memt
-	flushMemtable := oldMemtable
-
-	// 2. replace it with a new memtable
-	s.inner.memt = newMemtable
-
 	sstId := s.inner.nextSSTID
-
-	// 3. append memtable to immemtable
-	s.inner.immMemt = append(s.inner.immMemt, oldMemtable)
-	s.mu.Unlock()
-
-	// 4. flush memtable to a new table builder
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	flushMemtable := s.inner.immMemt[len(s.inner.immMemt)-1]
 	builder := sst.NewTableBuilder(4096)
 	flushMemtable.Flush(builder)
 
@@ -136,18 +128,15 @@ func (s *Storage) DebugScan(lower, upper []byte) iterator.Iter {
 	defer s.mu.RUnlock()
 	var iters []iterator.Iter
 	memtScan := s.inner.memt.Scan(lower, upper)
-	log.Printf("DebugScan: memtScan, valid: %t, key: %s", memtScan.IsValid(), memtScan.Key())
 	iters = append(iters, memtScan)
 
 	for _, mt := range s.inner.immMemt {
 		imemtScan := mt.Scan(lower, upper)
-		log.Printf("DebugScan: imemtScan, valid: %t, key: %s", imemtScan.IsValid(), imemtScan.Key())
 		iters = append(iters, imemtScan)
 	}
 
 	for t := range s.inner.l0SSTables {
 		sstIter := sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], lower)
-		log.Printf("DebugScan: imemtScan, valid: %t, key: %s", sstIter.IsValid(), sstIter.Key())
 		iters = append(iters, sstIter)
 	}
 
