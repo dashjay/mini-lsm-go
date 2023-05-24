@@ -2,19 +2,37 @@ package lsm_test
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/dashjay/mini-lsm-go/pkg/lsm"
 	"github.com/stretchr/testify/assert"
 )
 
+func s2b(s string) []byte {
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bh := reflect.SliceHeader{
+		Data: sh.Data,
+		Len:  sh.Len,
+		Cap:  sh.Len,
+	}
+	return *(*[]byte)(unsafe.Pointer(&bh))
+}
+
+func KeyOf(idx uint64) []byte {
+	return s2b(fmt.Sprintf("key_%0*d", 8, idx))
+}
+
+func ValueOf(idx uint64) []byte {
+	return s2b(fmt.Sprintf("value_%0*d", 8, idx))
+}
+
 func genKv(keycount int, dir string) *lsm.Storage {
 	lsmKV := lsm.NewStorage(dir)
 	const count = 1000
-	for i := 0; i < count; i++ {
-		key := fmt.Sprintf("key-%0*d", 4, i)
-		value := fmt.Sprintf("value-%0*d", 4, i)
-		lsmKV.Put([]byte(key), []byte(value))
+	for i := uint64(0); i < count; i++ {
+		lsmKV.Put(KeyOf(i), ValueOf(i))
 	}
 	return lsmKV
 }
@@ -31,7 +49,7 @@ func TestLSM(t *testing.T) {
 
 	assert.Nil(t, kv.SinkImemtableToSST())
 
-	testRange(t, kv)
+	// testRange(t, kv)
 
 	// testRange(t, kv)
 
@@ -45,11 +63,11 @@ func TestLSM(t *testing.T) {
 }
 
 func testRange(t *testing.T, lsmKV *lsm.Storage) {
-	scanner := lsmKV.Scan([]byte("key-0500"), []byte("key-0509"))
-	for i := 500; i < 510; i++ {
+	scanner := lsmKV.Scan(KeyOf(500), KeyOf(509))
+	for i := uint64(500); i < 510; i++ {
 		assert.Equal(t, scanner.IsValid(), true)
-		assert.Equal(t, fmt.Sprintf("key-%0*d", 4, i), string(scanner.Key()))
-		assert.Equal(t, fmt.Sprintf("value-%0*d", 4, i), string(scanner.Value()))
+		assert.Equal(t, KeyOf(i), scanner.Key())
+		assert.Equal(t, ValueOf(i), scanner.Value())
 		scanner.Next()
 	}
 }

@@ -2,7 +2,6 @@ package iterator
 
 import (
 	"bytes"
-	"log"
 )
 
 type MergeIterator struct {
@@ -23,9 +22,6 @@ func NewmergeIterator(in ...Iter) *MergeIterator {
 		iters = append(iters, in[i])
 	}
 
-	for i := range iters {
-		log.Printf("%d, NewmergeIterator, next: %s", i, iters[i].Key())
-	}
 	return &MergeIterator{iters: iters, current: findMinimalIter(iters)}
 }
 
