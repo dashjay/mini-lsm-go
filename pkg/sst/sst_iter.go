@@ -1,8 +1,6 @@
 package sst
 
 import (
-	"log"
-
 	"github.com/dashjay/mini-lsm-go/pkg/block"
 	"github.com/dashjay/mini-lsm-go/pkg/iterator"
 )
@@ -21,7 +19,6 @@ func NewIterAndSeekToFirst(table *Table) *Iter {
 }
 
 func NewIterAndSeekToKey(table *Table, key []byte) *Iter {
-	log.Printf("NewIterAndSeekToKey: %s", key)
 	blkIdx, iter := seekToKey(table, key)
 	return &Iter{table: table, blkIter: iter, blkIdx: blkIdx}
 }

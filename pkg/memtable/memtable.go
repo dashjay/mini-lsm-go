@@ -66,6 +66,9 @@ func (m *MemTableIterator) Value() []byte {
 }
 
 func (m *MemTableIterator) Key() []byte {
+	if m.ele == nil {
+		return nil
+	}
 	return inlineDeepcopy(m.ele.Key().([]byte))
 }
 

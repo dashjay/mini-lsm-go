@@ -105,7 +105,7 @@ func (t *Table) FindBlockIdx(key []byte) uint32 {
 	}
 	for i := uint32(0); i < t.Len(); i++ {
 		// firstKey <= key
-		if bytes.Compare(t.metas[i].FirstKey, key) <= 0 {
+		if bytes.Compare(t.metas[i].FirstKey, key) > 0 {
 			return satSub1(i)
 		}
 	}

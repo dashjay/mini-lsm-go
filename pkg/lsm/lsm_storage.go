@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/dashjay/mini-lsm-go/pkg/iterator"
@@ -92,7 +93,7 @@ func (s *Storage) Delete(key []byte) {
 }
 
 func (s *Storage) sstPath(id uint32) string {
-	return fmt.Sprintf("%d.sst", id)
+	return filepath.Join(s.path, fmt.Sprintf("%d.sst", id))
 }
 
 func (s *Storage) Sync() error {
@@ -130,31 +131,42 @@ func (s *Storage) Sync() error {
 	return nil
 }
 
-func (s *Storage) Scan(lower, upper []byte) iterator.Iter {
+func (s *Storage) DebugScan(lower, upper []byte) iterator.Iter {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var iters []iterator.Iter
 	memtScan := s.inner.memt.Scan(lower, upper)
-	if memtScan.IsValid() {
-		log.Printf("memtScan: %s", memtScan.Key())
-	}
+	log.Printf("DebugScan: memtScan, valid: %t, key: %s", memtScan.IsValid(), memtScan.Key())
 	iters = append(iters, memtScan)
 
 	for _, mt := range s.inner.immMemt {
 		imemtScan := mt.Scan(lower, upper)
-		if imemtScan.IsValid() {
-			log.Printf("imemTable: %s", imemtScan.Key())
-		}
+		log.Printf("DebugScan: imemtScan, valid: %t, key: %s", imemtScan.IsValid(), imemtScan.Key())
+		iters = append(iters, imemtScan)
+	}
+
+	for t := range s.inner.l0SSTables {
+		sstIter := sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], lower)
+		log.Printf("DebugScan: imemtScan, valid: %t, key: %s", sstIter.IsValid(), sstIter.Key())
+		iters = append(iters, sstIter)
+	}
+
+	return iterator.NewmergeIterator(iters...)
+}
+
+func (s *Storage) Scan(lower, upper []byte) iterator.Iter {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var iters []iterator.Iter
+
+	iters = append(iters, s.inner.memt.Scan(lower, upper))
+
+	for _, mt := range s.inner.immMemt {
 		iters = append(iters, mt.Scan(lower, upper))
 	}
 
 	for t := range s.inner.l0SSTables {
 		iters = append(iters, sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], lower))
-	}
-	for i := range iters {
-		if iters[i].IsValid() {
-			log.Printf("iter first key: %s\n", iters[i].Key())
-		}
 	}
 	return iterator.NewmergeIterator(iters...)
 }
