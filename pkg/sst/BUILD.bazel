@@ -16,12 +16,12 @@ go_library(
 )
 
 go_test(
-    name = "go_default_test",
+    name = "sst_test",
     srcs = ["sst_test.go"],
     deps = [
-        ":go_default_library",
-        "//pkg/test:go_default_library",
-        "@com_github_stretchr_testify//assert:go_default_library",
+        ":sst",
+        "//pkg/test",
+        "@com_github_stretchr_testify//assert",
     ],
 )
 
@@ -37,14 +37,4 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "sst_test",
-    srcs = ["sst_test.go"],
-    deps = [
-        ":sst",
-        "//pkg/test",
-        "@com_github_stretchr_testify//assert",
-    ],
 )

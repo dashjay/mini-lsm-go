@@ -5,9 +5,10 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dashjay/mini-lsm-go/pkg/block"
 	"github.com/dashjay/mini-lsm-go/pkg/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func generateBlock(t *testing.T) *block.Block {

@@ -3,8 +3,9 @@ package memtable
 import (
 	"bytes"
 
-	"github.com/dashjay/mini-lsm-go/pkg/sst"
 	"github.com/huandu/skiplist"
+
+	"github.com/dashjay/mini-lsm-go/pkg/sst"
 )
 
 type Table struct {

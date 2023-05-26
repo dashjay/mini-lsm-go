@@ -12,13 +12,13 @@ go_library(
 )
 
 go_test(
-    name = "go_default_test",
+    name = "iterator_test",
     srcs = ["interator_test.go"],
     deps = [
-        ":go_default_library",
-        "//pkg/sst:go_default_library",
-        "//pkg/test:go_default_library",
-        "@com_github_stretchr_testify//assert:go_default_library",
+        ":iterator",
+        "//pkg/sst",
+        "//pkg/test",
+        "@com_github_stretchr_testify//assert",
     ],
 )
 
@@ -34,15 +34,4 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "iterator_test",
-    srcs = ["interator_test.go"],
-    deps = [
-        ":iterator",
-        "//pkg/sst",
-        "//pkg/test",
-        "@com_github_stretchr_testify//assert",
-    ],
 )

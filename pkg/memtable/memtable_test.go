@@ -3,9 +3,10 @@ package memtable_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dashjay/mini-lsm-go/pkg/memtable"
 	"github.com/dashjay/mini-lsm-go/pkg/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestMemtable(t *testing.T) {

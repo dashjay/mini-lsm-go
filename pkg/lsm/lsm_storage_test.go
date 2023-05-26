@@ -3,8 +3,9 @@ package lsm
 import (
 	"testing"
 
-	"github.com/dashjay/mini-lsm-go/pkg/test"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dashjay/mini-lsm-go/pkg/test"
 )
 
 func genKv(keyCount uint64, dir string) *StorageInner {

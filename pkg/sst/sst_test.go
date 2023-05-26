@@ -8,9 +8,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dashjay/mini-lsm-go/pkg/sst"
 	"github.com/dashjay/mini-lsm-go/pkg/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestBuildSSTSingleKey(t *testing.T) {

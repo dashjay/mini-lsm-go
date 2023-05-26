@@ -9,11 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/dashjay/mini-lsm-go/pkg/block"
 	"github.com/dashjay/mini-lsm-go/pkg/iterator"
 	"github.com/dashjay/mini-lsm-go/pkg/memtable"
 	"github.com/dashjay/mini-lsm-go/pkg/sst"
-	"github.com/sirupsen/logrus"
 )
 
 type StorageInner struct {
