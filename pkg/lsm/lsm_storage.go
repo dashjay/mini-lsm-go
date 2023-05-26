@@ -6,170 +6,146 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/dashjay/mini-lsm-go/pkg/block"
 	"github.com/dashjay/mini-lsm-go/pkg/iterator"
 	"github.com/dashjay/mini-lsm-go/pkg/memtable"
 	"github.com/dashjay/mini-lsm-go/pkg/sst"
+	"github.com/sirupsen/logrus"
 )
 
 type StorageInner struct {
-	memt       *memtable.Table
+	// mu is rw lock, rLocker should be lock on every action not modified the following struct
+	// wLocker should be lock on every action modified the following struct
+	mu sync.RWMutex
+
+	memtKeyCount int64
+	memtSize     int64
+	memt         *memtable.Table
+
 	immMemt    []*memtable.Table
 	l0SSTables []*sst.Table
 	levels     [][]*sst.Table
+
 	nextSSTID  uint32
-}
-
-func NewStorageInner() *StorageInner {
-	return &StorageInner{
-		memt:       memtable.NewTable(),
-		immMemt:    make([]*memtable.Table, 0),
-		l0SSTables: make([]*sst.Table, 0),
-		levels:     make([][]*sst.Table, 0),
-		nextSSTID:  1,
-	}
-}
-
-type Storage struct {
-	inner      *StorageInner
-	mu         sync.RWMutex
-	flushLock  sync.Mutex
 	path       string
-	blockCache sync.Map
+	blockCache *sync.Map
 }
 
-func NewStorage(path string) *Storage {
-	return &Storage{
-		inner:      NewStorageInner(),
-		mu:         sync.RWMutex{},
-		flushLock:  sync.Mutex{},
-		path:       path,
-		blockCache: sync.Map{},
-	}
-}
-
-func (s *Storage) Get(key []byte) []byte {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	val := s.inner.memt.Get(key)
+func (si *StorageInner) Get(key []byte) []byte {
+	si.mu.RLock()
+	defer si.mu.RUnlock()
+	val := si.memt.Get(key)
 	if val != nil {
 		return val
 	}
-	for _, mt := range s.inner.immMemt {
+	for _, mt := range si.immMemt {
 		if val := mt.Get(key); val != nil {
 			return val
 		}
 	}
-	iters := make([]iterator.Iter, 0, len(s.inner.l0SSTables))
-	for t := range s.inner.l0SSTables {
-		iters = append(iters, sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], key))
+	iterators := make([]iterator.Iter, 0, len(si.l0SSTables))
+	for t := range si.l0SSTables {
+		iterators = append(iterators, sst.NewIterAndSeekToKey(si.l0SSTables[t], key))
 	}
-	iter := iterator.NewMergeIterator(iters...)
+	iter := iterator.NewMergeIterator(iterators...)
 	if iter.IsValid() {
 		return iter.Key()
 	}
 	return nil
 }
 
-func (s *Storage) Put(key, value []byte) {
+func (si *StorageInner) Put(key, value []byte) {
 	if len(value) == 0 {
 		panic("value cannot be empty")
 	}
 	if len(key) == 0 {
 		panic("key cannot be empty")
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	s.inner.memt.Put(key, value)
+	estimateSize := block.SizeOfUint16*2 + int64(len(key)) + int64(len(value)) + block.SizeOfUint16
+	si.mu.RLock()
+	si.memt.Put(key, value)
+	atomic.AddInt64(&si.memtKeyCount, 1)
+	atomic.AddInt64(&si.memtSize, estimateSize)
+	si.mu.RUnlock()
 }
 
-func (s *Storage) Delete(key []byte) {
+func (si *StorageInner) Delete(key []byte) {
 	if len(key) == 0 {
 		panic("key cannot be empty")
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	s.inner.memt.Put(key, nil)
+	si.mu.RLock()
+	si.memt.Put(key, nil)
+	si.mu.RUnlock()
 }
 
-func (s *Storage) sstPath(id uint32) string {
-	return filepath.Join(s.path, fmt.Sprintf("%d.sst", id))
+func (si *StorageInner) Scan(lower, upper []byte) iterator.Iter {
+	si.mu.RLock()
+	defer si.mu.RUnlock()
+	var iterators = make([]iterator.Iter, 0, 1+len(si.immMemt)+len(si.l0SSTables))
+	iterators = append(iterators, si.memt.Scan(lower, upper))
+	for _, mt := range si.immMemt {
+		iterators = append(iterators, mt.Scan(lower, upper))
+	}
+	for t := range si.l0SSTables {
+		iterators = append(iterators, sst.NewIterAndSeekToKey(si.l0SSTables[t], lower))
+	}
+	return iterator.NewMergeIterator(iterators...)
 }
 
-func (s *Storage) MakeNewMemtable() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.inner.memt, s.inner.immMemt = memtable.NewTable(), append(s.inner.immMemt, s.inner.memt)
+func (si *StorageInner) checkIfNewMemTableShouldBeCreate() bool {
+	return atomic.LoadInt64(&si.memtKeyCount) > 1000 || atomic.LoadInt64(&si.memtSize) > 4096*10
 }
 
-func (s *Storage) SinkImemtableToSST() error {
-	s.flushLock.Lock()
-	defer s.flushLock.Unlock()
-	sstId := s.inner.nextSSTID
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	flushMemtable := s.inner.immMemt[len(s.inner.immMemt)-1]
+func (si *StorageInner) newMemTable() {
+	si.mu.Lock()
+	si.memt, si.immMemt = memtable.NewTable(), append(si.immMemt, si.memt)
+	si.mu.Unlock()
+}
+
+func (si *StorageInner) sstPath(id uint32) string {
+	return filepath.Join(si.path, fmt.Sprintf("%d.sst", id))
+}
+
+func (si *StorageInner) checkIfImMemTableShouldFlushToSST() bool {
+	return len(si.immMemt) > 0
+}
+
+func (si *StorageInner) sinkImMemTableToSST() error {
+	sstID := si.nextSSTID
+	si.mu.Lock()
+	defer si.mu.Unlock()
+
+	flushMemTable := si.immMemt[len(si.immMemt)-1]
 	builder := sst.NewTableBuilder(4096)
-	flushMemtable.Flush(builder)
+	flushMemTable.Flush(builder)
 
-	sstable, err := builder.Build(sstId, s.blockCache, s.sstPath(sstId))
+	sstTable, err := builder.Build(sstID, si.blockCache, si.sstPath(sstID))
 	if err != nil {
 		return err
 	}
 
-	s.inner.immMemt = s.inner.immMemt[:len(s.inner.immMemt)-1]
-	s.inner.l0SSTables = append([]*sst.Table{sstable}, s.inner.l0SSTables...)
-	s.inner.nextSSTID += 1
+	si.immMemt = si.immMemt[:len(si.immMemt)-1]
+	si.l0SSTables = append([]*sst.Table{sstTable}, si.l0SSTables...)
+	si.nextSSTID += 1
 	return nil
 }
 
-func (s *Storage) DebugScan(lower, upper []byte) iterator.Iter {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	var iters []iterator.Iter
-	memtScan := s.inner.memt.Scan(lower, upper)
-	iters = append(iters, memtScan)
-
-	for _, mt := range s.inner.immMemt {
-		imemtScan := mt.Scan(lower, upper)
-		iters = append(iters, imemtScan)
-	}
-
-	for t := range s.inner.l0SSTables {
-		sstIter := sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], lower)
-		iters = append(iters, sstIter)
-	}
-
-	return iterator.NewMergeIterator(iters...)
+func (si *StorageInner) checkIfSSTShouldBeCompact() bool {
+	return len(si.l0SSTables) >= 2
 }
-
-func (s *Storage) Scan(lower, upper []byte) iterator.Iter {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	var iters []iterator.Iter
-
-	iters = append(iters, s.inner.memt.Scan(lower, upper))
-
-	for _, mt := range s.inner.immMemt {
-		iters = append(iters, mt.Scan(lower, upper))
-	}
-
-	for t := range s.inner.l0SSTables {
-		iters = append(iters, sst.NewIterAndSeekToKey(s.inner.l0SSTables[t], lower))
-	}
-	return iterator.NewMergeIterator(iters...)
-}
-
-func (s *Storage) Compact() {
-	log.Printf("compact with l0SSTables: %d", len(s.inner.l0SSTables))
-	if len(s.inner.l0SSTables) >= 2 {
-		s.mu.RLock()
-		l0SSTableLength := len(s.inner.l0SSTables)
-		sn := s.inner.l0SSTables[l0SSTableLength-1]
+func (si *StorageInner) compactSSTs() {
+	log.Printf("compact with l0SSTables: %d", len(si.l0SSTables))
+	if len(si.l0SSTables) >= 2 {
+		si.mu.RLock()
+		l0SSTableLength := len(si.l0SSTables)
+		sn := si.l0SSTables[l0SSTableLength-1]
 		snID := sn.SSTID()
-		snm1 := s.inner.l0SSTables[l0SSTableLength-2]
+		snm1 := si.l0SSTables[l0SSTableLength-2]
 		snm1ID := snm1.SSTID()
-		s.mu.RUnlock()
+		si.mu.RUnlock()
 
 		snIter := sst.NewIterAndSeekToFirst(sn)
 		snm1Iter := sst.NewIterAndSeekToFirst(snm1)
@@ -179,31 +155,69 @@ func (s *Storage) Compact() {
 			builder.AddByte(mergeIter.Key(), mergeIter.Value())
 			mergeIter.Next()
 		}
-		sstId := s.inner.nextSSTID
-		sstable, err := builder.Build(sstId, s.blockCache, s.sstPath(sstId))
+		sstID := si.nextSSTID
+		sstTable, err := builder.Build(sstID, si.blockCache, si.sstPath(sstID))
 		if err != nil {
 			log.Printf("sstable build fail: %s", err)
 		}
-		s.mu.Lock()
 		defer func() {
 			snm1.Close()
 			sn.Close()
-			os.Remove(s.sstPath(snID))
-			os.Remove(s.sstPath(snm1ID))
+			os.Remove(si.sstPath(snID))
+			os.Remove(si.sstPath(snm1ID))
 		}()
-		if s.inner.l0SSTables[l0SSTableLength-1].SSTID() == snID &&
-			s.inner.l0SSTables[l0SSTableLength-2].SSTID() == snm1ID {
-			for _, sst := range s.inner.l0SSTables {
-				log.Printf("sst: %d\n", sst.SSTID())
-			}
-			log.Println()
-			s.inner.l0SSTables = append(s.inner.l0SSTables[:l0SSTableLength-2], sstable)
-			for _, sst := range s.inner.l0SSTables {
-				log.Printf("sst: %d\n", sst.SSTID())
-			}
-			log.Println()
+		si.mu.Lock()
+		if si.l0SSTables[l0SSTableLength-1].SSTID() == snID &&
+			si.l0SSTables[l0SSTableLength-2].SSTID() == snm1ID {
+			si.l0SSTables = append(si.l0SSTables[:l0SSTableLength-2], sstTable)
 		}
-		s.mu.Unlock()
+		si.mu.Unlock()
 	}
+}
 
+func (si *StorageInner) internalLoopTask() {
+	ticker := time.NewTicker(5 * time.Second)
+	for range ticker.C {
+		if si.checkIfNewMemTableShouldBeCreate() {
+			logrus.Infoln("create new memtable")
+			si.newMemTable()
+		}
+
+		if si.checkIfImMemTableShouldFlushToSST() {
+			logrus.Infoln("start to sink immutable memtable to sst")
+			err := si.sinkImMemTableToSST()
+			if err != nil {
+				logrus.WithError(err).Errorln("sinkImMemTableToSST error")
+			}
+		}
+
+		if si.checkIfSSTShouldBeCompact() {
+			si.compactSSTs()
+		}
+	}
+}
+
+func NewStorageInner(path string) *StorageInner {
+	si := &StorageInner{
+		memt:       memtable.NewTable(),
+		immMemt:    make([]*memtable.Table, 0),
+		l0SSTables: make([]*sst.Table, 0),
+		levels:     make([][]*sst.Table, 0),
+		nextSSTID:  1,
+		path:       path,
+		blockCache: &sync.Map{},
+	}
+	go si.internalLoopTask()
+	return si
+}
+
+type Storage struct {
+	// inner StorageInner implement a lsm storage
+	*StorageInner
+}
+
+func NewStorage(path string) *Storage {
+	return &Storage{
+		StorageInner: NewStorageInner(path),
+	}
 }

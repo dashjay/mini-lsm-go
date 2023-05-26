@@ -33,7 +33,7 @@ func keyDeepcopy(key []byte) []byte {
 	return out
 }
 
-// NewTableBuilder recieve max blockSize and return a TableBuilder
+// NewTableBuilder receives max blockSize and return a TableBuilder
 func NewTableBuilder(blockSize uint64) *TableBuilder {
 	return &TableBuilder{
 		builder:   block.NewBlockBuilder(blockSize),
@@ -78,13 +78,13 @@ func (t *TableBuilder) AddByte(key, value []byte) {
 // Build build sst with all built block
 // WARNING: after Build calling
 // the data in TableBuilder is dirty(other metadata was appended to it)
-func (t *TableBuilder) Build(id uint32, cache sync.Map, path string) (*Table, error) {
+func (t *TableBuilder) Build(id uint32, cache *sync.Map, path string) (*Table, error) {
 	t.finishBlock()
 	buf := t.data
 	metaOffset := uint32(len(buf))
 	buf = block.AppendEncodedBlockMeta(t.metas, buf)
 	buf = binary.BigEndian.AppendUint32(buf, metaOffset)
-	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, err
 	}

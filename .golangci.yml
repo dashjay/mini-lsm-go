@@ -1,0 +1,129 @@
+# this config is referred from https://github.com/golangci/golangci-lint/blob/v1.23.8/.golangci.yml
+run:
+  deadline: 1200s
+  tests: true
+  skip-dirs:
+    - ^\.git
+    - ^bazel-.+
+  skip-files:
+    - zz_generated\.(api\.register)|(conversion)|(deepcopy)|(defaults)\.go$
+
+linters-settings:
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport # https://github.com/go-critic/go-critic/issues/845
+      - ifElseChain
+      - paramTypeCombine
+      - unnamedResult
+  goimports:
+    local-prefixes: github.com/dashjay/mini-lsm-go
+  golint:
+    min-confidence: 0
+  govet:
+    settings:
+      printf:
+        funcs:
+          - (github.com/sirupsen/logrus).Infof
+          - (github.com/sirupsen/logrus).Warnf
+          - (github.com/sirupsen/logrus).Debugf
+          - (github.com/sirupsen/logrus).Errorf
+          - (github.com/sirupsen/logrus).Fatalf
+  maligned:
+    suggest-new: true
+  misspell:
+    locale: US
+
+linters:
+  # please, do not use `enable-all`: it's deprecated and will be removed soon.
+  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
+  disable-all: true
+  enable:
+    - bodyclose
+    - dogsled
+    - goconst
+    - gofmt
+    - goimports
+    - goprintffuncname
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - rowserrcheck
+    - typecheck
+    - unconvert
+    - whitespace
+    - gocritic
+    - staticcheck
+    - stylecheck
+
+    # maybe rigorous
+    - exhaustive
+    - noctx
+    - goconst
+    - errcheck
+    - gocyclo
+    - unparam
+    - dupl
+    - depguard
+    - gosec
+    - gochecknoglobals
+    - godox
+    - prealloc
+    - unused
+    - gochecknoinits
+    - nakedret
+
+    #   disabled now
+    # - gocognit
+    # - gomnd
+    # - funlen
+
+issues:
+  exclude-rules:
+    - path: pkg/apis/
+      linters:
+        - golint
+      text: "type name will be used as .+ by other packages, and that stutters; consider calling this .+"
+    - linters:
+        - golint
+        - stylecheck
+      text: ".*should not use dot imports"
+    - linters:
+        - staticcheck
+      text: "package github.com/golang/protobuf/proto is deprecated: Use the \"google.golang.org/protobuf/proto\" package instead."
+    - linters:
+        - golint
+      text: "don't use [A-Z_]+ in Go names; use CamelCase"
+    - linters:
+        - golint
+      text: "don't use underscores in Go names; func SetDefaults_[a-zA-Z0-9_]+ should be"
+    - linters:
+        - golint
+      text: "exported func .+ returns unexported type .+, which can be annoying to use"
+    - linters:
+        - stylecheck
+      text: "ST1003: should not use .+"
+    - linters:
+        - deadcode
+      text: "`.+` is unused"
+    - linters:
+        - misspell
+      text: "marshalling"
+    - linters:
+        - gocritic
+      text: "hugeParam"
+    - linters:
+        - gocritic
+      text: "unnecessaryDefer: defer .+ is placed just before return"
+    - linters:
+        - gocritic
+      text: "filepathJoin: .+ contains a path separator"
+    - linters:
+        - gocritic
+      text: "appendAssign: append result not assigned to the same slice"

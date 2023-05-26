@@ -17,7 +17,16 @@ func s2b(s string) []byte {
 		Len:  sh.Len,
 		Cap:  sh.Len,
 	}
+	// // nolint:govet // unsafe for transfer string to []byte
 	return *(*[]byte)(unsafe.Pointer(&bh))
+}
+
+func BigKeyOf(idx uint64) []byte {
+	return s2b(fmt.Sprintf("big_key_%0*d", 16, idx))
+}
+
+func BigValueOf(idx uint64) []byte {
+	return s2b(fmt.Sprintf("big_value_%0*d", 16, idx))
 }
 
 func KeyOf(idx uint64) []byte {
@@ -40,6 +49,6 @@ func GenerateSST(tempdirFn func() string, keyCount uint64) (*sst.Table, string, 
 	}
 	tempdir := tempdirFn()
 	fp := filepath.Join(tempdir, "1.sst")
-	sstable, err := tb.Build(1, sync.Map{}, fp)
+	sstable, err := tb.Build(1, &sync.Map{}, fp)
 	return sstable, fp, err
 }

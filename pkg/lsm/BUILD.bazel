@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "lsm",
+    srcs = ["lsm_storage.go"],
+    importpath = "github.com/dashjay/mini-lsm-go/pkg/lsm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/block",
+        "//pkg/iterator",
+        "//pkg/memtable",
+        "//pkg/sst",
+        "@com_github_sirupsen_logrus//:logrus",
+    ],
+)
+
+go_test(
+    name = "lsm_test",
+    srcs = ["lsm_storage_test.go"],
+    embed = [":lsm"],
+    deps = [
+        "//pkg/test",
+        "@com_github_stretchr_testify//assert",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,50 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "sst",
+    srcs = [
+        "sst_builder.go",
+        "sst_iter.go",
+        "sst_table.go",
+    ],
+    importpath = "github.com/dashjay/mini-lsm-go/pkg/sst",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/block",
+        "//pkg/iterator",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["sst_test.go"],
+    deps = [
+        ":go_default_library",
+        "//pkg/test:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "sst_test",
+    srcs = ["sst_test.go"],
+    deps = [
+        ":sst",
+        "//pkg/test",
+        "@com_github_stretchr_testify//assert",
+    ],
+)

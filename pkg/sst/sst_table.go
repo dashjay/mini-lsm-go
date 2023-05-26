@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -27,21 +28,30 @@ type Table struct {
 	id          uint32
 
 	// blockCache is a map[[2]uint32]*block.Block
-	blockCache sync.Map
+	blockCache *sync.Map
 }
 
-func OpenTableFromFile(id uint32, blockCache sync.Map, fd *os.File) (*Table, error) {
+func OpenTableFromFile(id uint32, blockCache *sync.Map, fd *os.File) (*Table, error) {
 	fi, err := fd.Stat()
 	if err != nil {
 		return nil, err
 	}
 	// read metaoffset(last block.SizeOfUint32 byte)
 	var rawMetaOffset [block.SizeOfUint32]byte
-	fd.ReadAt(rawMetaOffset[:], fi.Size()-block.SizeOfUint32)
+	n, err := fd.ReadAt(rawMetaOffset[:], fi.Size()-block.SizeOfUint32)
+	if err != nil {
+		return nil, err
+	}
+	if n != block.SizeOfUint32 {
+		return nil, fmt.Errorf("misread the metaoffset %d, should be %d", n, block.SizeOfUint32)
+	}
 	blockMetaOffset := binary.BigEndian.Uint32(rawMetaOffset[:])
 
 	// seek to offset for reading metadata
-	fd.Seek(int64(blockMetaOffset), io.SeekStart)
+	_, err = fd.Seek(int64(blockMetaOffset), io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
 
 	// sst: | blocks | block_metadata{offset, firstkey} | metadata_offset |
 	rawMetas, err := block.DecodeBlockMetaFromReader(io.LimitReader(fd, fi.Size()-block.SizeOfUint32-int64(blockMetaOffset)))

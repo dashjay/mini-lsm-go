@@ -1,0 +1,162 @@
+load("//build:utils.bzl", "go_prefix")
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)
+
+_BUILDIFIER = "@com_github_bazelbuild_buildtools//buildifier"
+
+_GAZELLE = "@bazel_gazelle//cmd/gazelle"
+
+_KAZEL = "@io_k8s_repo_infra//cmd/kazel"
+
+sh_binary(
+    name = "update-bazel",
+    srcs = ["update-bazel.sh"],
+    args = [
+        "$(location %s)" % _BUILDIFIER,
+        "$(location %s)" % _GAZELLE,
+        "$(location %s)" % _KAZEL,
+    ],
+    data = [
+        _BUILDIFIER,
+        _GAZELLE,
+        _KAZEL,
+    ],
+)
+
+sh_test(
+    name = "verify-bazel",
+    srcs = ["verify-bazel.sh"],
+    args = [
+        "$(location %s)" % _BUILDIFIER,
+        "$(location %s)" % _GAZELLE,
+        "$(location %s)" % _KAZEL,
+    ],
+    data = [
+        "@//:all-srcs",
+        _BUILDIFIER,
+        _GAZELLE,
+        _KAZEL,
+    ],
+    tags = ["lint"],
+)
+
+_GO = "@go_sdk//:bin/go"
+
+sh_binary(
+    name = "update-deps",
+    srcs = ["update-deps.sh"],
+    args = [
+        "$(location %s)" % _GO,
+        "$(location %s)" % _GAZELLE,
+    ],
+    data = [
+        _GO,
+        _GAZELLE,
+    ],
+)
+
+filegroup(
+    name = "all-protos",
+    srcs = [
+        "//pkg/proto/storage:storage_go_proto",
+    ],
+)
+
+genrule(
+    name = "genproto",
+    srcs = [":all-protos"],
+    outs = ["proto-outs"],
+    cmd = """for p in $(locations :all-protos)
+do
+    mkdir -p $@/github.com/dashjay/mini-lsm-go/ && \
+    rp=$$(realpath $$p) && \
+    cp -rf $${rp%.a}_/* $@/
+done""",
+)
+
+sh_binary(
+    name = "update-proto",
+    srcs = ["update-proto.sh"],
+    args = [
+        "$(execpaths proto-outs)",
+        go_prefix,
+    ],
+    data = ["proto-outs"],
+)
+
+_GOLANGCI_LINT = "//build:golangci-lint"
+
+sh_test(
+    name = "verify-golangci-lint",
+    size = "enormous",
+    srcs = ["verify-golangci-lint.sh"],
+    args = [
+        "$(location %s)" % _GO,
+        "$(location %s)" % _GOLANGCI_LINT,
+    ],
+    data = [
+        "@//:all-srcs",
+        _GO,
+        _GOLANGCI_LINT,
+        "@go_sdk//:files",
+    ],
+    tags = ["lint"],
+)
+
+_SHELLCHECK = "//build:shellcheck"
+
+sh_test(
+    name = "verify-shellcheck",
+    srcs = ["verify-shellcheck.sh"],
+    args = [
+        "$(location %s)" % _SHELLCHECK,
+    ],
+    data = [
+        "@//:all-srcs",
+        _SHELLCHECK,
+    ],
+    tags = ["lint"],
+)
+
+sh_test(
+    name = "verify-proto",
+    srcs = ["verify-proto.sh"],
+    args = [
+        "$(locations proto-outs)",
+        go_prefix,
+    ],
+    data = [
+        "proto-outs",
+        "@//:all-srcs",
+    ],
+)
+
+sh_test(
+    name = "verify-deps",
+    size = "large",
+    srcs = ["verify-deps.sh"],
+    args = [
+        "$(location :update-deps)",
+        "$(location %s)" % _GO,
+        "$(location %s)" % _GAZELLE,
+    ],
+    data = [
+        _GAZELLE,
+        _GO,
+        ":update-deps",
+        "@//:all-srcs",
+    ],
+    tags = ["lint"],
+)

@@ -1,48 +1,62 @@
-package lsm_test
+package lsm
 
 import (
 	"testing"
 
-	"github.com/dashjay/mini-lsm-go/pkg/lsm"
 	"github.com/dashjay/mini-lsm-go/pkg/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func genKv(keycount int, dir string) *lsm.Storage {
-	lsmKV := lsm.NewStorage(dir)
-	const count = 1000
-	for i := uint64(0); i < count; i++ {
+func genKv(keyCount uint64, dir string) *StorageInner {
+	lsmKV := NewStorageInner(dir)
+	for i := uint64(0); i < keyCount; i++ {
 		lsmKV.Put(test.KeyOf(i), test.ValueOf(i))
 	}
 	return lsmKV
 }
 
-func TestLSM(t *testing.T) {
+func TestInternalStorage(t *testing.T) {
 	tempDir := t.TempDir()
 	kv := genKv(1000, tempDir)
 
 	testRange(t, kv)
 
-	kv.MakeNewMemtable()
+	kv.newMemTable()
 
 	testRange(t, kv)
 
-	assert.Nil(t, kv.SinkImemtableToSST())
+	assert.Nil(t, kv.sinkImMemTableToSST())
 
-	// testRange(t, kv)
+	testRange(t, kv)
 
-	// testRange(t, kv)
+	kv.Put(test.KeyOf(400), test.ValueOf(0))
+	kv.Put(test.KeyOf(401), test.ValueOf(0))
 
-	// assert.Nil(t, kv.Sync())
+	testRange(t, kv)
 
-	// testRange(t, kv)
+	kv.newMemTable()
 
-	// kv.Compact()
+	testRange(t, kv)
 
-	// testRange(t, kv)
+	assert.Nil(t, kv.sinkImMemTableToSST())
+
+	testRange(t, kv)
+
+	kv.compactSSTs()
+
+	testRange(t, kv)
 }
 
-func testRange(t *testing.T, lsmKV *lsm.Storage) {
+func BenchmarkLSM(b *testing.B) {
+	lsmKV := NewStorage(b.TempDir())
+	for i := 0; i < b.N; i++ {
+		key := test.BigKeyOf(uint64(i))
+		value := test.BigValueOf(uint64(i))
+		lsmKV.Put(key, value)
+	}
+}
+
+func testRange(t *testing.T, lsmKV *StorageInner) {
 	scanner := lsmKV.Scan(test.KeyOf(500), test.KeyOf(509))
 	for i := uint64(500); i < 510; i++ {
 		assert.Equal(t, scanner.IsValid(), true)

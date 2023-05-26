@@ -21,7 +21,7 @@ func NewMergeIterator(in ...Iter) *MergeIterator {
 
 	iters := make([]Iter, 0)
 	for i := range in {
-		if in[i].IsValid() == false {
+		if !in[i].IsValid() {
 			continue
 		}
 		iters = append(iters, in[i])
@@ -60,7 +60,7 @@ func (m *MergeIterator) Next() {
 
 	// 1. move current iter to next
 	m.iters[m.current].Next()
-	if m.iters[m.current].IsValid() == false {
+	if !m.iters[m.current].IsValid() {
 		m.iters = append(m.iters[:m.current], m.iters[m.current+1:]...)
 	}
 
@@ -74,7 +74,7 @@ func (m *MergeIterator) Next() {
 	// 3. remove all invalid iter
 	i := len(m.iters) - 1
 	for i >= 0 {
-		if m.iters[i].IsValid() == false {
+		if !m.iters[i].IsValid() {
 			m.iters = append(m.iters[:i], m.iters[i+1:]...)
 		}
 		i--

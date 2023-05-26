@@ -89,7 +89,7 @@ func TestTwoMerge2(t *testing.T) {
 	})
 }
 
-func TestMerge1(t *testing.T) {
+func newMockIterator() (iterator.Iter, iterator.Iter, iterator.Iter) {
 	i1 := NewMockIterator([]struct{ K, V []byte }{
 		{[]byte("a"), []byte("1.1")},
 		{[]byte("b"), []byte("2.1")},
@@ -106,6 +106,11 @@ func TestMerge1(t *testing.T) {
 		{[]byte("c"), []byte("3.3")},
 		{[]byte("d"), []byte("4.3")},
 	})
+	return i1, i2, i3
+}
+
+func TestMerge1(t *testing.T) {
+	i1, i2, i3 := newMockIterator()
 	CheckIterResult(t, iterator.NewMergeIterator(i1, i2, i3), []struct{ K, V []byte }{
 		{[]byte("a"), []byte("1.1")},
 		{[]byte("b"), []byte("2.1")},
@@ -115,22 +120,7 @@ func TestMerge1(t *testing.T) {
 }
 
 func TestMerge2(t *testing.T) {
-	i1 := NewMockIterator([]struct{ K, V []byte }{
-		{[]byte("a"), []byte("1.1")},
-		{[]byte("b"), []byte("2.1")},
-		{[]byte("c"), []byte("3.1")},
-	})
-	i2 := NewMockIterator([]struct{ K, V []byte }{
-		{[]byte("a"), []byte("1.2")},
-		{[]byte("b"), []byte("2.2")},
-		{[]byte("c"), []byte("3.2")},
-		{[]byte("d"), []byte("4.2")},
-	})
-	i3 := NewMockIterator([]struct{ K, V []byte }{
-		{[]byte("b"), []byte("2.3")},
-		{[]byte("c"), []byte("3.3")},
-		{[]byte("d"), []byte("4.3")},
-	})
+	i1, i2, i3 := newMockIterator()
 	CheckIterResult(t, iterator.NewMergeIterator(i3, i2, i1), []struct{ K, V []byte }{
 		{[]byte("a"), []byte("1.2")},
 		{[]byte("b"), []byte("2.3")},
@@ -141,13 +131,12 @@ func TestMerge2(t *testing.T) {
 
 func TestMergeTwo(t *testing.T) {
 	dir := t.TempDir()
-
 	sb := sst.NewTableBuilder(4096)
 	sb.Add("a", "1.1")
 	sb.Add("b", "1.2")
 	sb.Add("c", "1.3")
 	sb.Add("f", "1.5")
-	st, err := sb.Build(0, sync.Map{}, filepath.Join(dir, "1.sst"))
+	st, err := sb.Build(0, &sync.Map{}, filepath.Join(dir, "1.sst"))
 	assert.Nil(t, err)
 	defer st.Close()
 
@@ -185,7 +174,7 @@ func TestMergeTwo(t *testing.T) {
 	defer ssta.Close()
 	sb = sst.NewTableBuilder(4096)
 	sb.AddByte(test.KeyOf(128), test.ValueOf(0))
-	sstb, err := sb.Build(0, sync.Map{}, filepath.Join(dir, "1.sst"))
+	sstb, err := sb.Build(0, &sync.Map{}, filepath.Join(dir, "1.sst"))
 	assert.Nil(t, err)
 	defer sstb.Close()
 	var result = []struct{ K, V []byte }{}
@@ -216,13 +205,13 @@ func TestMergeThree(t *testing.T) {
 
 	sb := sst.NewTableBuilder(4096)
 	sb.AddByte(test.KeyOf(128), test.ValueOf(0))
-	sstb, err := sb.Build(0, sync.Map{}, filepath.Join(t.TempDir(), "1.sst"))
+	sstb, err := sb.Build(0, &sync.Map{}, filepath.Join(t.TempDir(), "1.sst"))
 	assert.Nil(t, err)
 	defer sstb.Close()
 
 	sb = sst.NewTableBuilder(4096)
 	sb.AddByte(test.KeyOf(127), test.ValueOf(0))
-	sstc, err := sb.Build(0, sync.Map{}, filepath.Join(t.TempDir(), "2.sst"))
+	sstc, err := sb.Build(0, &sync.Map{}, filepath.Join(t.TempDir(), "2.sst"))
 	assert.Nil(t, err)
 	defer sstc.Close()
 	var result = []struct{ K, V []byte }{}

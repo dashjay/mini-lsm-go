@@ -37,40 +37,40 @@ func (b *Builder) isEmpty() bool {
 }
 
 // Add receives a pair of key value(string), return whether it was added to builder
-func (b *Builder) Add(Key, Value string) bool {
-	if Key == "" {
+func (b *Builder) Add(key, value string) bool {
+	if key == "" {
 		panic("key must not be empty")
 	}
-	if b.estimatedSzie()+uint64(len(Key))+uint64(len(Value))+
+	if b.estimatedSzie()+uint64(len(key))+uint64(len(value))+
 		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
 		!b.isEmpty() {
 		return false
 	}
 	b.offsets = append(b.offsets, uint16(len(b.data)))
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(Key)))
-	b.data = append(b.data, Key...)
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(Value)))
-	b.data = append(b.data, Value...)
+	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(key)))
+	b.data = append(b.data, key...)
+	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(value)))
+	b.data = append(b.data, value...)
 	return true
 }
 
 // AddByte receives a pair of key value([]byte), return whether it was added to builder
-func (b *Builder) AddByte(Key, Value []byte) bool {
-	if len(Key) == 0 {
+func (b *Builder) AddByte(key, value []byte) bool {
+	if len(key) == 0 {
 		panic("key must not be empty")
 	}
 	// estimate size calculate out Block size
 	// check if it is enough to append a pair of key, value, their size and an offset.
-	if b.estimatedSzie()+uint64(len(Key))+uint64(len(Value))+
+	if b.estimatedSzie()+uint64(len(key))+uint64(len(value))+
 		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
 		!b.isEmpty() {
 		return false
 	}
 	b.offsets = append(b.offsets, uint16(len(b.data)))
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(Key)))
-	b.data = append(b.data, Key...)
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(Value)))
-	b.data = append(b.data, Value...)
+	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(key)))
+	b.data = append(b.data, key...)
+	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(value)))
+	b.data = append(b.data, value...)
 	return true
 }
 

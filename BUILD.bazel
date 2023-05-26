@@ -1,0 +1,38 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/dashjay/mini-lsm-go
+gazelle(
+    name = "gazelle",
+    command = "fix",
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(
+        ["**"],
+        exclude = [
+            "bazel-*/**",
+            ".git/**",
+        ],
+    ),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//build:all-srcs",
+        "//hack:all-srcs",
+        "//pkg/block:all-srcs",
+        "//pkg/iterator:all-srcs",
+        "//pkg/lsm:all-srcs",
+        "//pkg/memtable:all-srcs",
+        "//pkg/proto/storage:all-srcs",
+        "//pkg/sst:all-srcs",
+        "//pkg/test:all-srcs",
+    ],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

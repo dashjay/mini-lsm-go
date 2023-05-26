@@ -23,10 +23,9 @@ func NewIterAndSeekToKey(table *Table, key []byte) *Iter {
 	return &Iter{table: table, blkIter: iter, blkIdx: blkIdx}
 }
 
-func (i *Iter) SeekToFirst() (err error) {
+func (i *Iter) SeekToFirst() {
 	i.blkIdx = 0
 	i.blkIter = block.NewBlockIterAndSeekToFirst(i.table.ReadBlockCached(0))
-	return
 }
 
 func seekToKey(t *Table, key []byte) (uint32, *block.Iter) {

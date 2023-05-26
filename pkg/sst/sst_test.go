@@ -1,7 +1,8 @@
 package sst_test
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
@@ -16,7 +17,7 @@ func TestBuildSSTSingleKey(t *testing.T) {
 	tb := sst.NewTableBuilder(16)
 	tb.Add("233", "233333")
 	tempdir := t.TempDir()
-	_, err := tb.Build(0, sync.Map{}, filepath.Join(tempdir, "1.sst"))
+	_, err := tb.Build(0, &sync.Map{}, filepath.Join(tempdir, "1.sst"))
 	assert.Nil(t, err)
 }
 
@@ -30,7 +31,7 @@ func TestBuildSSTTowBlocks(t *testing.T) {
 	tb.Add("66", "66")
 	assert.Greater(t, tb.Len(), uint32(2))
 	tempdir := t.TempDir()
-	sstable, err := tb.Build(0, sync.Map{}, filepath.Join(tempdir, "1.sst"))
+	sstable, err := tb.Build(0, &sync.Map{}, filepath.Join(tempdir, "1.sst"))
 	assert.Nil(t, err)
 	assert.NotNil(t, sstable)
 }
@@ -46,7 +47,7 @@ func TestSSTDecode(t *testing.T) {
 	assert.Nil(t, err)
 	fd, err := os.Open(fp)
 	assert.Nil(t, err)
-	nsstable, err := sst.OpenTableFromFile(0, sync.Map{}, fd)
+	nsstable, err := sst.OpenTableFromFile(0, &sync.Map{}, fd)
 	assert.Nil(t, err)
 	assert.Equal(t, sstable.Meta(), nsstable.Meta())
 	assert.Nil(t, sstable.Close())
@@ -76,7 +77,8 @@ func TestSSTIterSeekToKey(t *testing.T) {
 	defer sstable.Close()
 	iter := sst.NewIterAndSeekToFirst(sstable)
 	for i := 0; i < 5; i++ {
-		idx := rand.Uint64() % 1000
+		rdInt, _ := rand.Int(rand.Reader, big.NewInt(64))
+		idx := rdInt.Uint64() % 1000
 		iter.SeekToKey(test.KeyOf(idx))
 		key := iter.Key()
 		value := iter.Value()
@@ -97,7 +99,7 @@ func BenchmarkSSTDecode(b *testing.B) {
 	st.Close()
 	for i := 0; i < b.N; i++ {
 		fd, _ := os.Open(fp)
-		tb, _ := sst.OpenTableFromFile(0, sync.Map{}, fd)
+		tb, _ := sst.OpenTableFromFile(0, &sync.Map{}, fd)
 		tb.Close()
 	}
 }
