@@ -53,7 +53,7 @@ func (si *StorageInner) Get(key []byte) []byte {
 	}
 	iter := iterator.NewMergeIterator(iterators...)
 	if iter.IsValid() {
-		return iter.Key()
+		return iter.Value()
 	}
 	return nil
 }
@@ -103,6 +103,8 @@ func (si *StorageInner) checkIfNewMemTableShouldBeCreate() bool {
 func (si *StorageInner) newMemTable() {
 	si.mu.Lock()
 	si.memt, si.immMemt = memtable.NewTable(), append(si.immMemt, si.memt)
+	atomic.SwapInt64(&si.memtKeyCount, 0)
+	atomic.SwapInt64(&si.memtSize, 0)
 	si.mu.Unlock()
 }
 
@@ -193,6 +195,7 @@ func (si *StorageInner) internalLoopTask() {
 		}
 
 		if si.checkIfSSTShouldBeCompact() {
+			// now compact has problem
 			si.compactSSTs()
 		}
 	}

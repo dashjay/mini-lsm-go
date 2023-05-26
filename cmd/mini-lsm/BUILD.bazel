@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "mini-lsm_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/dashjay/mini-lsm-go/cmd/mini-lsm",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/lsm",
+        "@com_github_sirupsen_logrus//:logrus",
+        "@com_github_tidwall_redcon//:redcon",
+    ],
+)
+
+go_binary(
+    name = "mini-lsm",
+    embed = [":mini-lsm_lib"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

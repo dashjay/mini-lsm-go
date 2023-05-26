@@ -107,11 +107,12 @@ func (t *TableBuilder) Len() uint32 {
 
 func (t *TableBuilder) finishBlock() {
 	builder := t.builder
-	t.metas = append(t.metas, &block.Meta{
-		Offset:   uint32(len(t.data)),
-		FirstKey: keyDeepcopy(t.firstKey),
-	})
-	t.data = append(t.data, builder.Build().Encode()...)
-
+	if !builder.IsEmpty() {
+		t.metas = append(t.metas, &block.Meta{
+			Offset:   uint32(len(t.data)),
+			FirstKey: keyDeepcopy(t.firstKey),
+		})
+		t.data = append(t.data, builder.Build().Encode()...)
+	}
 	t.builder = block.NewBlockBuilder(t.blockSize)
 }

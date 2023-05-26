@@ -98,6 +98,30 @@ def go_repositories():
         sum = "h1:w7B6lhMri9wdJUVmEZPGGhZzrYTPvgJArz7wNPgYKsk=",
         version = "v1.8.1",
     )
+    go_repository(
+        name = "com_github_tidwall_btree",
+        build_file_generation = "on",
+        build_file_proto_mode = "disable",
+        importpath = "github.com/tidwall/btree",
+        sum = "h1:5P+9WU8ui5uhmcg3SoPyTwoI0mVyZ1nps7YQzTZFkYM=",
+        version = "v1.1.0",
+    )
+    go_repository(
+        name = "com_github_tidwall_match",
+        build_file_generation = "on",
+        build_file_proto_mode = "disable",
+        importpath = "github.com/tidwall/match",
+        sum = "h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=",
+        version = "v1.1.1",
+    )
+    go_repository(
+        name = "com_github_tidwall_redcon",
+        build_file_generation = "on",
+        build_file_proto_mode = "disable",
+        importpath = "github.com/tidwall/redcon",
+        sum = "h1:5qfvrrybgtO85jnhSravmkZyC0D+7WstbfCs3MmPhow=",
+        version = "v1.6.2",
+    )
 
     go_repository(
         name = "in_gopkg_check_v1",

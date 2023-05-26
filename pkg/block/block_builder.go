@@ -32,7 +32,7 @@ func (b *Builder) estimatedSzie() uint64 {
 	return uint64(len(b.data)) + uint64(len(b.offsets))*SizeOfUint16 + SizeOfUint16
 }
 
-func (b *Builder) isEmpty() bool {
+func (b *Builder) IsEmpty() bool {
 	return len(b.offsets) == 0
 }
 
@@ -43,7 +43,7 @@ func (b *Builder) Add(key, value string) bool {
 	}
 	if b.estimatedSzie()+uint64(len(key))+uint64(len(value))+
 		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
-		!b.isEmpty() {
+		!b.IsEmpty() {
 		return false
 	}
 	b.offsets = append(b.offsets, uint16(len(b.data)))
@@ -63,7 +63,7 @@ func (b *Builder) AddByte(key, value []byte) bool {
 	// check if it is enough to append a pair of key, value, their size and an offset.
 	if b.estimatedSzie()+uint64(len(key))+uint64(len(value))+
 		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
-		!b.isEmpty() {
+		!b.IsEmpty() {
 		return false
 	}
 	b.offsets = append(b.offsets, uint16(len(b.data)))
@@ -76,7 +76,7 @@ func (b *Builder) AddByte(key, value []byte) bool {
 
 // Build return the Block which Builder built
 func (b *Builder) Build() *Block {
-	if b.isEmpty() {
+	if b.IsEmpty() {
 		panic("block should not be empty")
 	}
 	return &Block{

@@ -24,6 +24,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//build:all-srcs",
+        "//cmd/mini-lsm:all-srcs",
         "//hack:all-srcs",
         "//pkg/block:all-srcs",
         "//pkg/iterator:all-srcs",
