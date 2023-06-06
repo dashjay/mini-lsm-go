@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"sync"
 
 	"github.com/dashjay/mini-lsm-go/pkg/block"
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
 )
 
 var ErrReadBlockError = errors.New("read block error")
@@ -36,13 +36,13 @@ func OpenTableFromFile(id uint32, blockCache *sync.Map, fd *os.File) (*Table, er
 	if err != nil {
 		return nil, err
 	}
-	// read metaoffset(last block.SizeOfUint32 byte)
+	// read meta offset(last block.SizeOfUint32 byte)
 	var rawMetaOffset [block.SizeOfUint32]byte
-	n, err := fd.ReadAt(rawMetaOffset[:], fi.Size()-block.SizeOfUint32)
+	n, err := fd.ReadAt(rawMetaOffset[:], int64(uint16(fi.Size())-block.SizeOfUint32))
 	if err != nil {
 		return nil, err
 	}
-	if n != block.SizeOfUint32 {
+	if uint16(n) != block.SizeOfUint32 {
 		return nil, fmt.Errorf("misread the metaoffset %d, should be %d", n, block.SizeOfUint32)
 	}
 	blockMetaOffset := binary.BigEndian.Uint32(rawMetaOffset[:])
@@ -54,7 +54,7 @@ func OpenTableFromFile(id uint32, blockCache *sync.Map, fd *os.File) (*Table, er
 	}
 
 	// sst: | blocks | block_metadata{offset, firstkey} | metadata_offset |
-	rawMetas, err := block.DecodeBlockMetaFromReader(io.LimitReader(fd, fi.Size()-block.SizeOfUint32-int64(blockMetaOffset)))
+	rawMetas, err := block.DecodeBlockMetaFromReader(io.LimitReader(fd, int64(uint16(fi.Size())-block.SizeOfUint32)-int64(blockMetaOffset)))
 	if err != nil {
 		return nil, err
 	}
@@ -98,10 +98,7 @@ func (t *Table) ReadBlockCached(blockIdx uint32) *block.Block {
 		return v.(*block.Block)
 	}
 	blk, err := t.ReadBlock(blockIdx)
-	if err != nil {
-		log.Printf("ReadBlock error: %s", err)
-		return nil
-	}
+	utils.Assertf(err == nil, "read block id: %d error: %s", blockIdx, err)
 	t.blockCache.Store(key, blk)
 	return blk
 }

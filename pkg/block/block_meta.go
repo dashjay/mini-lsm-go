@@ -1,9 +1,12 @@
 package block
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
+
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
 )
 
 var ErrInvalidBlockMeta = errors.New("invalid block meta")
@@ -13,24 +16,28 @@ type Meta struct {
 	FirstKey []byte
 }
 
-// AppendEncodedBlockMeta help append all metaData to bytes buffer
-func AppendEncodedBlockMeta(metaList []*Meta, buf []byte) []byte {
-	estimatedSize := 0
+// EncodedBlockMeta help append all metaData to bytes buffer
+func EncodedBlockMeta(metaList []*Meta) []byte {
+	estimateMetadataSize := uint16(0)
 	for _, meta := range metaList {
-		estimatedSize += SizeOfUint32
-		estimatedSize += SizeOfUint16
-		estimatedSize += len(meta.FirstKey)
+		estimateMetadataSize += SizeOfUint32
+		estimateMetadataSize += SizeOfUint16
+		estimateMetadataSize += uint16(len(meta.FirstKey))
 	}
-	originLen := len(buf)
+
+	var buffer bytes.Buffer
+	var buf [SizeOfUint32]byte
 	for _, meta := range metaList {
-		buf = binary.BigEndian.AppendUint32(buf, meta.Offset)
-		buf = binary.BigEndian.AppendUint16(buf, uint16(len(meta.FirstKey)))
-		buf = append(buf, meta.FirstKey...)
+		binary.BigEndian.PutUint32(buf[:SizeOfUint32], meta.Offset)
+		buffer.Write(buf[:SizeOfUint32])
+		binary.BigEndian.PutUint16(buf[:SizeOfUint16], uint16(len(meta.FirstKey)))
+		buffer.Write(buf[:SizeOfUint16])
+		buffer.Write(meta.FirstKey)
 	}
-	if estimatedSize != len(buf)-originLen {
-		panic("buf size error after encoding")
-	}
-	return buf
+	utils.Assertf(estimateMetadataSize == uint16(buffer.Len()),
+		"buf size error after encoding, estimateMetadataSize: %d should be equal to buffer.Len(): %d", estimateMetadataSize, buffer.Len())
+
+	return buffer.Bytes()
 }
 
 // DecodeBlockMeta read []*Meta from byte slice
@@ -57,7 +64,7 @@ func readUint32(r io.Reader) (uint32, error) {
 		}
 		return 0, ErrInvalidBlockMeta
 	}
-	if n != SizeOfUint32 {
+	if uint16(n) != SizeOfUint32 {
 		return 0, ErrInvalidBlockMeta
 	}
 	return binary.BigEndian.Uint32(temp[:]), nil
@@ -72,7 +79,7 @@ func readUint16(r io.Reader) (uint16, error) {
 		}
 		return 0, ErrInvalidBlockMeta
 	}
-	if n != SizeOfUint16 {
+	if uint16(n) != SizeOfUint16 {
 		return 0, ErrInvalidBlockMeta
 	}
 	return binary.BigEndian.Uint16(temp[:]), nil

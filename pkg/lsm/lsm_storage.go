@@ -1,6 +1,7 @@
 package lsm
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
 	"github.com/sirupsen/logrus"
 
 	"github.com/dashjay/mini-lsm-go/pkg/block"
@@ -52,31 +54,26 @@ func (si *StorageInner) Get(key []byte) []byte {
 		iterators = append(iterators, sst.NewIterAndSeekToKey(si.l0SSTables[t], key))
 	}
 	iter := iterator.NewMergeIterator(iterators...)
-	if iter.IsValid() {
+	if iter.IsValid() && bytes.Equal(iter.Key(), key) {
 		return iter.Value()
 	}
 	return nil
 }
 
 func (si *StorageInner) Put(key, value []byte) {
-	if len(value) == 0 {
-		panic("value cannot be empty")
-	}
-	if len(key) == 0 {
-		panic("key cannot be empty")
-	}
-	estimateSize := block.SizeOfUint16*2 + int64(len(key)) + int64(len(value)) + block.SizeOfUint16
+	utils.Assert(len(value) != 0, "value cannot be empty")
+	utils.Assert(len(key) != 0, "key cannot be empty")
+
+	estimateSize := block.SizeOfUint16*2 + uint16(len(key)) + uint16(len(value)) + block.SizeOfUint16
 	si.mu.RLock()
 	si.memt.Put(key, value)
 	atomic.AddInt64(&si.memtKeyCount, 1)
-	atomic.AddInt64(&si.memtSize, estimateSize)
+	atomic.AddInt64(&si.memtSize, int64(estimateSize))
 	si.mu.RUnlock()
 }
 
 func (si *StorageInner) Delete(key []byte) {
-	if len(key) == 0 {
-		panic("key cannot be empty")
-	}
+	utils.Assert(len(key) != 0, "key cannot be empty")
 	si.mu.RLock()
 	si.memt.Put(key, nil)
 	si.mu.RUnlock()
@@ -162,7 +159,9 @@ func (si *StorageInner) compactSSTs() {
 		sstTable, err := builder.Build(sstID, si.blockCache, si.sstPath(sstID))
 		if err != nil {
 			log.Printf("sstable build fail: %s", err)
+			return
 		}
+		si.nextSSTID += 1
 		defer func() {
 			snm1.Close()
 			sn.Close()

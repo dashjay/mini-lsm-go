@@ -1,11 +1,14 @@
 package sst
 
 import (
+	"bufio"
 	"encoding/binary"
+	"math"
 	"os"
 	"sync"
 
 	"github.com/dashjay/mini-lsm-go/pkg/block"
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
 )
 
 // TableBuilder can build sst
@@ -24,7 +27,7 @@ type TableBuilder struct {
 	metas []*block.Meta
 
 	// blockSize is size of every Block
-	blockSize uint64
+	blockSize uint16
 }
 
 func keyDeepcopy(key []byte) []byte {
@@ -34,7 +37,7 @@ func keyDeepcopy(key []byte) []byte {
 }
 
 // NewTableBuilder receives max blockSize and return a TableBuilder
-func NewTableBuilder(blockSize uint64) *TableBuilder {
+func NewTableBuilder(blockSize uint16) *TableBuilder {
 	return &TableBuilder{
 		builder:   block.NewBlockBuilder(blockSize),
 		metas:     make([]*block.Meta, 0),
@@ -58,7 +61,7 @@ func (t *TableBuilder) Add(key, value string) {
 	t.firstKey = []byte(key)
 }
 
-// Add receives a pair of key value([]byte), if builder has been full, we'll close
+// AddByte receives a pair of key value([]byte), if builder has been full, we'll close
 // current block, create new Block then add key-value to it.
 func (t *TableBuilder) AddByte(key, value []byte) {
 	if t.firstKey == nil {
@@ -67,11 +70,8 @@ func (t *TableBuilder) AddByte(key, value []byte) {
 	if t.builder.AddByte(key, value) {
 		return
 	}
-
 	t.finishBlock()
-	if !t.builder.AddByte(key, value) {
-		panic("build error")
-	}
+	utils.Assert(t.builder.AddByte(key, value), "table builder add key value failed")
 	t.firstKey = keyDeepcopy(key)
 }
 
@@ -79,16 +79,34 @@ func (t *TableBuilder) AddByte(key, value []byte) {
 // WARNING: after Build calling
 // the data in TableBuilder is dirty(other metadata was appended to it)
 func (t *TableBuilder) Build(id uint32, cache *sync.Map, path string) (*Table, error) {
-	t.finishBlock()
-	buf := t.data
-	metaOffset := uint32(len(buf))
-	buf = block.AppendEncodedBlockMeta(t.metas, buf)
-	buf = binary.BigEndian.AppendUint32(buf, metaOffset)
-	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_EXCL, 0o644)
 	if err != nil {
 		return nil, err
 	}
-	_, err = fd.Write(buf)
+	t.finishBlock()
+	blockMeta := block.EncodedBlockMeta(t.metas)
+
+	bw := bufio.NewWriter(fd)
+	n, err := bw.Write(t.data)
+	if err != nil {
+		return nil, err
+	}
+	utils.Assertf(n == len(t.data), "mismatch data size write to sst file")
+	n, err = bw.Write(blockMeta)
+	if err != nil {
+		return nil, err
+	}
+	utils.Assertf(n == len(blockMeta), "mismatch block meta size write to sst file")
+
+	metaOffset := len(t.data)
+	utils.Assertf(metaOffset < math.MaxUint32, "metaOffset %d should be less than 1<<32-1", metaOffset)
+	var buf [block.SizeOfUint32]byte
+	binary.BigEndian.PutUint32(buf[:], uint32(metaOffset))
+	_, err = bw.Write(buf[:])
+	if err != nil {
+		return nil, err
+	}
+	err = bw.Flush()
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +114,7 @@ func (t *TableBuilder) Build(id uint32, cache *sync.Map, path string) (*Table, e
 		id:          id,
 		fd:          fd,
 		metas:       t.metas,
-		metaOffsets: metaOffset,
+		metaOffsets: uint32(metaOffset),
 		blockCache:  cache,
 	}, nil
 }

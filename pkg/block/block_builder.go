@@ -2,6 +2,8 @@ package block
 
 import (
 	"encoding/binary"
+
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
 )
 
 // Builder is used to build a block
@@ -12,11 +14,11 @@ import (
 type Builder struct {
 	offsets   []uint16
 	data      []byte
-	blockSize uint64
+	blockSize uint16
 }
 
 // NewBlockBuilder return a Builder for giving size
-func NewBlockBuilder(size uint64) *Builder {
+func NewBlockBuilder(size uint16) *Builder {
 	return &Builder{
 		offsets:   make([]uint16, 0),
 		data:      make([]byte, 0),
@@ -28,8 +30,8 @@ func NewBlockBuilder(size uint64) *Builder {
 // layout of Block is like this:
 // | data(N Byte) | offset0(2 Byte) | offset1 ... | offsetN | offsetNum(dataNum | 2Byte) |
 // Builder can estimate size of a Block
-func (b *Builder) estimatedSzie() uint64 {
-	return uint64(len(b.data)) + uint64(len(b.offsets))*SizeOfUint16 + SizeOfUint16
+func (b *Builder) estimatedSize() uint16 {
+	return SizeOfUint16 + uint16(len(b.offsets))*SizeOfUint16 + SizeOfUint16 + uint16(len(b.data))
 }
 
 func (b *Builder) IsEmpty() bool {
@@ -38,10 +40,9 @@ func (b *Builder) IsEmpty() bool {
 
 // Add receives a pair of key value(string), return whether it was added to builder
 func (b *Builder) Add(key, value string) bool {
-	if key == "" {
-		panic("key must not be empty")
-	}
-	if b.estimatedSzie()+uint64(len(key))+uint64(len(value))+
+	utils.Assert(key != "", "expect none empty key")
+
+	if b.estimatedSize()+uint16(len(key))+uint16(len(value))+
 		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
 		!b.IsEmpty() {
 		return false
@@ -56,12 +57,11 @@ func (b *Builder) Add(key, value string) bool {
 
 // AddByte receives a pair of key value([]byte), return whether it was added to builder
 func (b *Builder) AddByte(key, value []byte) bool {
-	if len(key) == 0 {
-		panic("key must not be empty")
-	}
+	utils.Assert(len(key) != 0, "expect none empty key")
+
 	// estimate size calculate out Block size
 	// check if it is enough to append a pair of key, value, their size and an offset.
-	if b.estimatedSzie()+uint64(len(key))+uint64(len(value))+
+	if b.estimatedSize()+uint16(len(key))+uint16(len(value))+
 		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
 		!b.IsEmpty() {
 		return false
@@ -76,9 +76,9 @@ func (b *Builder) AddByte(key, value []byte) bool {
 
 // Build return the Block which Builder built
 func (b *Builder) Build() *Block {
-	if b.IsEmpty() {
-		panic("block should not be empty")
-	}
+	utils.Assert(!b.IsEmpty(),
+		"expect builder is not empty")
+
 	return &Block{
 		data:    b.data,
 		offsets: b.offsets,

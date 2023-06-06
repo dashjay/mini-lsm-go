@@ -33,6 +33,7 @@ filegroup(
         "//pkg/proto/storage:all-srcs",
         "//pkg/sst:all-srcs",
         "//pkg/test:all-srcs",
+        "//pkg/utils:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

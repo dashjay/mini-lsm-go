@@ -3,6 +3,8 @@ package block
 import (
 	"bytes"
 	"encoding/binary"
+
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
 )
 
 // Iter can hold an Block, for iterating it one-by-one.
@@ -26,9 +28,9 @@ func NewBlockIter(block *Block) *Iter {
 
 // NewBlockIterAndSeekToFirst receives a block, create a Iter, seek to first key, return it.
 func NewBlockIterAndSeekToFirst(block *Block) *Iter {
-	i := NewBlockIter(block)
-	i.SeekTo(0)
-	return i
+	iter := NewBlockIter(block)
+	iter.SeekTo(0)
+	return iter
 }
 
 // NewBlockIterAndSeekToKey receives a block, create a Iter, seek to specified key, return it.
@@ -40,7 +42,7 @@ func NewBlockIterAndSeekToKey(block *Block, key []byte) *Iter {
 
 // IsValid checks that whether Iter valid
 func (b *Iter) IsValid() bool {
-	return b.block != nil && len(b.key) != 0
+	return b != nil && b.block != nil && len(b.key) != 0
 }
 
 // SeekToFirst help Iter to seek to first key
@@ -50,9 +52,7 @@ func (b *Iter) SeekToFirst() {
 
 // Key get key for current pos
 func (b *Iter) Key() []byte {
-	if len(b.key) == 0 {
-		panic("invalid iterator")
-	}
+	utils.Assert(len(b.key) != 0, "invalid iterator, you should call IsValid to check iter valid")
 	// WARNING: we assumed that return key will not be modified
 	// key := make([]byte, len(b.key))
 	// copy(key, b.key)
@@ -62,9 +62,7 @@ func (b *Iter) Key() []byte {
 
 // Value get value for current pos
 func (b *Iter) Value() []byte {
-	if len(b.key) == 0 {
-		panic("invalid iterator")
-	}
+	utils.Assert(len(b.key) != 0, "invalid iterator, you should call IsValid to check iter valid")
 	// WARNING: we assumed that return value will not be modified
 	// value := make([]byte, len(b.value))
 	// copy(value, b.value)
@@ -105,11 +103,11 @@ func (b *Iter) SeekToKey(key []byte) {
 	high := len(b.block.offsets)
 
 	for low < high {
-		mid := (low + (high-low)/2)
+		mid := low + (high-low)/2
 		b.SeekTo(uint64(mid))
-		if !b.IsValid() {
-			panic("invalid block")
-		}
+
+		utils.Assert(b.IsValid(), "encountered invalid block")
+
 		switch bytes.Compare(b.key, key) {
 		case 0:
 			return
@@ -119,10 +117,13 @@ func (b *Iter) SeekToKey(key []byte) {
 			high = mid
 		}
 	}
+
 	b.SeekTo(uint64(low))
 }
 
 func (b *Iter) seekToOffset(offset uint64) {
+	utils.Assertf(offset < uint64(len(b.block.data)),
+		"offset should be less than block data, offset: %d, len(b.block.data): %d", offset, len(b.block.data))
 	entry := b.block.data[offset:]
 
 	keyLen := binary.BigEndian.Uint16(entry[:2])

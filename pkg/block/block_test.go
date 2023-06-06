@@ -1,7 +1,6 @@
 package block_test
 
 import (
-	"bytes"
 	"crypto/rand"
 	"testing"
 
@@ -71,23 +70,20 @@ func TestBlockIter(t *testing.T) {
 	iter.SeekToFirst()
 	key0 := test.KeyOf(0)
 	value0 := test.ValueOf(0)
-	if !bytes.Equal(iter.Key(), key0) || !bytes.Equal(iter.Value(), value0) {
-		t.Error("seek to first error")
-	}
+	assert.Equal(t, key0, iter.Key())
+	assert.Equal(t, value0, iter.Value())
 
 	iter.Next()
 	key1 := test.KeyOf(1)
 	value1 := test.ValueOf(1)
-	if !bytes.Equal(iter.Key(), key1) || !bytes.Equal(iter.Value(), value1) {
-		t.Error("seek to next error")
-	}
+	assert.Equal(t, key1, iter.Key())
+	assert.Equal(t, value1, iter.Value())
 
 	key50 := test.KeyOf(50)
 	value50 := test.ValueOf(50)
 	iter.SeekToKey(key50)
-	if !bytes.Equal(iter.Key(), key50) || !bytes.Equal(iter.Value(), value50) {
-		t.Error("seek to key error")
-	}
+	assert.Equal(t, key50, iter.Key())
+	assert.Equal(t, value50, iter.Value())
 }
 
 func TestBlockMeta(t *testing.T) {
@@ -96,7 +92,7 @@ func TestBlockMeta(t *testing.T) {
 		buf := make([]byte, 200)
 		_, _ = rand.Read(buf)
 		input := buf
-		block.AppendEncodedBlockMeta(bms, input)
+		block.EncodedBlockMeta(bms, input)
 		assert.Equal(t, buf, input[:200])
 	})
 
@@ -105,7 +101,7 @@ func TestBlockMeta(t *testing.T) {
 		buf := make([]byte, 200)
 		_, _ = rand.Read(buf)
 		input := buf
-		input = block.AppendEncodedBlockMeta(bms, input)
+		input = block.EncodedBlockMeta(bms, input)
 		assert.Equal(t, buf, input[:200])
 		metas := block.DecodeBlockMeta(input[200:])
 		assert.Equal(t, len(bms), len(metas))
@@ -113,7 +109,7 @@ func TestBlockMeta(t *testing.T) {
 	})
 }
 
-func newBlock(blockSize uint64, keyCount uint64) *block.Block {
+func newBlock(blockSize uint16, keyCount uint64) *block.Block {
 	bb := block.NewBlockBuilder(blockSize)
 	for i := uint64(0); i < keyCount; i++ {
 		bb.AddByte(test.KeyOf(i), test.ValueOf(i))
@@ -121,12 +117,12 @@ func newBlock(blockSize uint64, keyCount uint64) *block.Block {
 	return bb.Build()
 }
 
-func newBlockIter(blockSize uint64, keyCount uint64) *block.Iter {
+func newBlockIter(blockSize uint16, keyCount uint64) *block.Iter {
 	return block.NewBlockIter(newBlock(blockSize, keyCount))
 }
 
 func BenchmarkBlockEncode(b *testing.B) {
-	blk := newBlock(655350, 10000)
+	blk := newBlock(4096, 10000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = blk.Encode()
@@ -134,7 +130,7 @@ func BenchmarkBlockEncode(b *testing.B) {
 }
 
 func BenchmarkBlockDecode(b *testing.B) {
-	blk := newBlock(655350, 10000)
+	blk := newBlock(4096, 10000)
 	blockByte := blk.Encode()
 	var emptyBlock = &block.Block{}
 	b.ResetTimer()
@@ -145,7 +141,7 @@ func BenchmarkBlockDecode(b *testing.B) {
 
 func BenchmarkBlockBuild(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		newBlockIter(512*1024, 10000)
+		newBlockIter(4096, 10000)
 	}
 }
 

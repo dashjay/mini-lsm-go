@@ -9,6 +9,7 @@ go_library(
     ],
     importpath = "github.com/dashjay/mini-lsm-go/pkg/iterator",
     visibility = ["//visibility:public"],
+    deps = ["//pkg/utils"],
 )
 
 go_test(
