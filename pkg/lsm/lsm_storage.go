@@ -10,8 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dashjay/mini-lsm-go/pkg/utils"
 	"github.com/sirupsen/logrus"
+
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
 
 	"github.com/dashjay/mini-lsm-go/pkg/block"
 	"github.com/dashjay/mini-lsm-go/pkg/iterator"

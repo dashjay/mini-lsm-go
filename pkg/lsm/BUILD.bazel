@@ -10,6 +10,7 @@ go_library(
         "//pkg/iterator",
         "//pkg/memtable",
         "//pkg/sst",
+        "//pkg/utils",
         "@com_github_sirupsen_logrus//:logrus",
     ],
 )

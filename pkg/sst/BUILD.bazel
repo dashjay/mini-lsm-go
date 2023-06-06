@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//pkg/block",
         "//pkg/iterator",
+        "//pkg/utils",
     ],
 )
 

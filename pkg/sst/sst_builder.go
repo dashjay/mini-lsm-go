@@ -85,7 +85,6 @@ func (t *TableBuilder) Build(id uint32, cache *sync.Map, path string) (*Table, e
 	}
 	t.finishBlock()
 	blockMeta := block.EncodedBlockMeta(t.metas)
-
 	bw := bufio.NewWriter(fd)
 	n, err := bw.Write(t.data)
 	if err != nil {
@@ -107,6 +106,10 @@ func (t *TableBuilder) Build(id uint32, cache *sync.Map, path string) (*Table, e
 		return nil, err
 	}
 	err = bw.Flush()
+	if err != nil {
+		return nil, err
+	}
+	err = fd.Sync()
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,6 @@
 package block_test
 
 import (
-	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -87,25 +86,11 @@ func TestBlockIter(t *testing.T) {
 }
 
 func TestBlockMeta(t *testing.T) {
-	t.Run("test-block-meta-encode", func(t *testing.T) {
+	t.Run("test-block-meta-encode-and-decode", func(t *testing.T) {
 		bms := generateBlockMeta()
-		buf := make([]byte, 200)
-		_, _ = rand.Read(buf)
-		input := buf
-		block.EncodedBlockMeta(bms, input)
-		assert.Equal(t, buf, input[:200])
-	})
-
-	t.Run("test-block-meta-decode", func(t *testing.T) {
-		bms := generateBlockMeta()
-		buf := make([]byte, 200)
-		_, _ = rand.Read(buf)
-		input := buf
-		input = block.EncodedBlockMeta(bms, input)
-		assert.Equal(t, buf, input[:200])
-		metas := block.DecodeBlockMeta(input[200:])
-		assert.Equal(t, len(bms), len(metas))
-		assert.Equal(t, bms, metas)
+		blockMeta := block.EncodedBlockMeta(bms)
+		bmsN := block.DecodeBlockMeta(blockMeta)
+		assert.Equal(t, bms, bmsN)
 	})
 }
 

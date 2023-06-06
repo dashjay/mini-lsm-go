@@ -175,7 +175,7 @@ func TestMergeTwo(t *testing.T) {
 	defer ssta.Close()
 	sb = sst.NewTableBuilder(4096)
 	sb.AddByte(test.KeyOf(128), test.ValueOf(0))
-	sstb, err := sb.Build(0, &sync.Map{}, filepath.Join(dir, "1.sst"))
+	sstb, err := sb.Build(0, &sync.Map{}, filepath.Join(dir, "2.sst"))
 	assert.Nil(t, err)
 	defer sstb.Close()
 	var result = []struct{ K, V []byte }{}

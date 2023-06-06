@@ -21,7 +21,6 @@ type Block struct {
 }
 
 func (b *Block) estimateBlockByteSize() uint16 {
-
 	return /* 1. offset */ SizeOfUint16 +
 		/* 2. offset items */ uint16(len(b.offsets))*SizeOfUint16 +
 		/* 3. data site */ SizeOfUint16 +
