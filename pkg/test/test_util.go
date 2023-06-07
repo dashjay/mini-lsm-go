@@ -41,11 +41,25 @@ const (
 	GenerateBlockSize = 4096
 )
 
-func GenerateSST(tempdirFn func() string, keyCount uint64) (*sst.Table, string, error) {
+type Pair struct {
+	Key, Value []byte
+}
+
+func NewKeyValuePair(keyCount uint64) []Pair {
+	var out = make([]Pair, 0, keyCount)
+	for i := uint64(0); i < keyCount; i++ {
+		out = append(out, Pair{
+			Key:   KeyOf(i),
+			Value: ValueOf(i),
+		})
+	}
+	return out
+}
+
+func GenerateSST(tempdirFn func() string, keyValuePairs []Pair) (*sst.Table, string, error) {
 	tb := sst.NewTableBuilder(GenerateBlockSize)
-	for idx := uint64(0); idx < keyCount; idx++ {
-		key, value := KeyOf(idx), ValueOf(idx)
-		tb.AddByte(key, value)
+	for i := range keyValuePairs {
+		tb.AddByte(keyValuePairs[i].Key, keyValuePairs[i].Value)
 	}
 	tempdir := tempdirFn()
 	fp := filepath.Join(tempdir, "1.sst")

@@ -12,6 +12,7 @@ func Assert(assert bool, message string) {
 		logrus.Fatalln(message)
 	}
 }
+
 func Assertf(assert bool, message string, params ...interface{}) {
 	if !assert {
 		debug.PrintStack()

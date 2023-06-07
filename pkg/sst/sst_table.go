@@ -43,7 +43,7 @@ func OpenTableFromFile(id uint32, blockCache *sync.Map, fd *os.File) (*Table, er
 		return nil, err
 	}
 	if uint16(n) != block.SizeOfUint32 {
-		return nil, fmt.Errorf("misread the metaoffset %d, should be %d", n, block.SizeOfUint32)
+		return nil, fmt.Errorf("misread the meta offset %d, should be %d", n, block.SizeOfUint32)
 	}
 	blockMetaOffset := binary.BigEndian.Uint32(rawMetaOffset[:])
 
@@ -79,7 +79,8 @@ func (t *Table) ReadBlock(blockIdx uint32) (*block.Block, error) {
 	} else {
 		offsetEnd = t.metaOffsets
 	}
-	data := make([]byte, offsetEnd-offset)
+	data := utils.GlobalPool.Get(int(offsetEnd - offset))
+	defer utils.GlobalPool.Put(data)
 	n, err := t.fd.ReadAt(data, int64(offset))
 	if err != nil {
 		return nil, err

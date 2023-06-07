@@ -12,17 +12,21 @@ import (
 // data:
 // keyLen | key | valueLen | value
 type Builder struct {
-	offsets   []uint16
-	data      []byte
+	offsets []uint16
+
+	data       []byte
+	dataCursor int
+
 	blockSize uint16
 }
 
 // NewBlockBuilder return a Builder for giving size
 func NewBlockBuilder(size uint16) *Builder {
 	return &Builder{
-		offsets:   make([]uint16, 0),
-		data:      make([]byte, 0),
-		blockSize: size,
+		offsets:    make([]uint16, 0),
+		data:       utils.GlobalPool.Get(int(size)),
+		dataCursor: 0,
+		blockSize:  size,
 	}
 }
 
@@ -31,10 +35,7 @@ func NewBlockBuilder(size uint16) *Builder {
 // | offsetLen | offset0(2 Byte) | offset1 ... | offsetN | dataLen | data(N Byte)  |
 // Builder can estimate size of a Block
 func (b *Builder) currentSize() uint16 {
-	return SizeOfUint16 +
-		uint16(len(b.offsets))*SizeOfUint16 +
-		SizeOfUint16 +
-		uint16(len(b.data))
+	return uint16(b.dataCursor)
 }
 
 func (b *Builder) IsEmpty() bool {
@@ -58,11 +59,17 @@ func (b *Builder) Add(key, value string) bool {
 		!b.IsEmpty() {
 		return false
 	}
-	b.offsets = append(b.offsets, uint16(len(b.data)))
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(key)))
-	b.data = append(b.data, key...)
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(value)))
-	b.data = append(b.data, value...)
+	b.offsets = append(b.offsets, b.currentSize())
+
+	binary.BigEndian.PutUint16(b.data[b.dataCursor:b.dataCursor+int(SizeOfUint16)], uint16(len(key)))
+	b.dataCursor += int(SizeOfUint16)
+
+	b.dataCursor += copy(b.data[b.dataCursor:], key)
+
+	binary.BigEndian.PutUint16(b.data[b.dataCursor:b.dataCursor+int(SizeOfUint16)], uint16(len(value)))
+	b.dataCursor += int(SizeOfUint16)
+
+	b.dataCursor += copy(b.data[b.dataCursor:], value)
 	return true
 }
 
@@ -70,17 +77,21 @@ func (b *Builder) Add(key, value string) bool {
 func (b *Builder) AddByte(key, value []byte) bool {
 	utils.Assert(len(key) != 0, "expect none empty key")
 
-	// estimate size calculate out Block size
-	// check if it is enough to append a pair of key, value, their size and an offset.
 	if b.currentSize()+estimateGrow(key, value) > b.blockSize &&
 		!b.IsEmpty() {
 		return false
 	}
-	b.offsets = append(b.offsets, uint16(len(b.data)))
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(key)))
-	b.data = append(b.data, key...)
-	b.data = binary.BigEndian.AppendUint16(b.data, uint16(len(value)))
-	b.data = append(b.data, value...)
+	b.offsets = append(b.offsets, uint16(b.dataCursor))
+
+	binary.BigEndian.PutUint16(b.data[b.dataCursor:b.dataCursor+int(SizeOfUint16)], uint16(len(key)))
+	b.dataCursor += int(SizeOfUint16)
+
+	b.dataCursor += copy(b.data[b.dataCursor:], key)
+
+	binary.BigEndian.PutUint16(b.data[b.dataCursor:b.dataCursor+int(SizeOfUint16)], uint16(len(value)))
+	b.dataCursor += int(SizeOfUint16)
+
+	b.dataCursor += copy(b.data[b.dataCursor:], value)
 	return true
 }
 
@@ -90,7 +101,7 @@ func (b *Builder) Build() *Block {
 		"expect builder is not empty")
 
 	return &Block{
-		data:    b.data,
+		data:    b.data[:b.dataCursor],
 		offsets: b.offsets,
 	}
 }

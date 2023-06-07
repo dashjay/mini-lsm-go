@@ -19,6 +19,7 @@ go_test(
     deps = [
         ":block",
         "//pkg/test",
+        "//pkg/utils",
         "@com_github_stretchr_testify//assert",
     ],
 )

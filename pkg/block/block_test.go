@@ -5,12 +5,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dashjay/mini-lsm-go/pkg/utils"
+
 	"github.com/dashjay/mini-lsm-go/pkg/block"
 	"github.com/dashjay/mini-lsm-go/pkg/test"
 )
 
 func generateBlock(t *testing.T) *block.Block {
-	bb := block.NewBlockBuilder(10000)
+	bb := block.NewBlockBuilder(8192)
 	for i := uint64(0); i < 100; i++ {
 		key := test.KeyOf(i)
 		val := test.ValueOf(i)
@@ -95,10 +97,19 @@ func TestBlockMeta(t *testing.T) {
 	})
 }
 
+func newKeyValuePair(keyCount uint64) []struct{ key, value []byte } {
+	var out []struct{ key, value []byte }
+	for i := uint64(0); i < keyCount; i++ {
+		out = append(out, struct{ key, value []byte }{key: test.KeyOf(i), value: test.ValueOf(i)})
+	}
+	return out
+}
+
 func newBlock(blockSize uint16, keyCount uint64) *block.Block {
 	bb := block.NewBlockBuilder(blockSize)
-	for i := uint64(0); i < keyCount; i++ {
-		bb.AddByte(test.KeyOf(i), test.ValueOf(i))
+	pairs := newKeyValuePair(keyCount)
+	for i := range pairs {
+		bb.AddByte(pairs[i].key, pairs[i].value)
 	}
 	return bb.Build()
 }
@@ -108,15 +119,16 @@ func newBlockIter(blockSize uint16, keyCount uint64) *block.Iter {
 }
 
 func BenchmarkBlockEncode(b *testing.B) {
-	blk := newBlock(4096, 10000)
+	blk := newBlock(8192, 10000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = blk.Encode()
+		bd := blk.Encode()
+		utils.GlobalPool.Put(bd)
 	}
 }
 
 func BenchmarkBlockDecode(b *testing.B) {
-	blk := newBlock(4096, 10000)
+	blk := newBlock(8192, 10000)
 	blockByte := blk.Encode()
 	var emptyBlock = &block.Block{}
 	b.ResetTimer()
@@ -126,14 +138,22 @@ func BenchmarkBlockDecode(b *testing.B) {
 }
 
 func BenchmarkBlockBuild(b *testing.B) {
+	pairs := test.NewKeyValuePair(10000)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		newBlockIter(4096, 10000)
+		bb := block.NewBlockBuilder(8192)
+		for j := range pairs {
+			if !bb.AddByte(pairs[j].Key, pairs[j].Value) {
+				break
+			}
+		}
+		_ = bb.Build()
 	}
 }
 
 func BenchmarkBlockIter(b *testing.B) {
 	count := uint64(1000)
-	iter := newBlockIter(65535, count)
+	iter := newBlockIter(8192, count)
 
 	b.Run("test seek to idx", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

@@ -171,7 +171,8 @@ func TestMergeTwo(t *testing.T) {
 		{[]byte("f"), []byte("1.5")},
 	})
 
-	ssta, _, _ := test.GenerateSST(t.TempDir, 500)
+	pairs := test.NewKeyValuePair(500)
+	ssta, _, _ := test.GenerateSST(t.TempDir, pairs)
 	defer ssta.Close()
 	sb = sst.NewTableBuilder(4096)
 	sb.AddByte(test.KeyOf(128), test.ValueOf(0))
@@ -202,7 +203,8 @@ func TestMergeTwo(t *testing.T) {
 }
 
 func TestMergeThree(t *testing.T) {
-	ssta, _, _ := test.GenerateSST(t.TempDir, 500)
+	pairs := test.NewKeyValuePair(500)
+	ssta, _, _ := test.GenerateSST(t.TempDir, pairs)
 
 	sb := sst.NewTableBuilder(4096)
 	sb.AddByte(test.KeyOf(128), test.ValueOf(0))

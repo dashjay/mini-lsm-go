@@ -49,9 +49,11 @@ func DecodeBlockMeta(input []byte) ([]*Meta, error) {
 	return DecodeBlockMetaFromReader(bytes.NewReader(input))
 }
 
-func readUint32(r io.Reader) (uint32, error) {
-	var temp [SizeOfUint32]byte
-	n, err := r.Read(temp[:])
+func readUint32(r io.Reader, buffer []byte) (uint32, error) {
+	if buffer == nil {
+		buffer = make([]byte, SizeOfUint32)
+	}
+	n, err := r.Read(buffer[:SizeOfUint32])
 	if err != nil {
 		if err == io.EOF {
 			return 0, io.EOF
@@ -61,12 +63,14 @@ func readUint32(r io.Reader) (uint32, error) {
 	if uint16(n) != SizeOfUint32 {
 		return 0, ErrInvalidBlockMeta
 	}
-	return binary.BigEndian.Uint32(temp[:]), nil
+	return binary.BigEndian.Uint32(buffer[:SizeOfUint32]), nil
 }
 
-func readUint16(r io.Reader) (uint16, error) {
-	var temp [SizeOfUint16]byte
-	n, err := r.Read(temp[:])
+func readUint16(r io.Reader, buffer []byte) (uint16, error) {
+	if buffer == nil {
+		buffer = make([]byte, SizeOfUint16)
+	}
+	n, err := r.Read(buffer[:SizeOfUint16])
 	if err != nil {
 		if err == io.EOF {
 			return 0, io.EOF
@@ -76,14 +80,15 @@ func readUint16(r io.Reader) (uint16, error) {
 	if uint16(n) != SizeOfUint16 {
 		return 0, ErrInvalidBlockMeta
 	}
-	return binary.BigEndian.Uint16(temp[:]), nil
+	return binary.BigEndian.Uint16(buffer[:SizeOfUint16]), nil
 }
 
 // DecodeBlockMetaFromReader reads []*Meta from reader
 func DecodeBlockMetaFromReader(r io.Reader) ([]*Meta, error) {
 	var metas = make([]*Meta, 0)
+	buffer := make([]byte, SizeOfUint32)
 	for {
-		meta, err := decodeBlock(r)
+		meta, err := decodeBlock(r, buffer)
 		if err == io.EOF {
 			return metas, nil
 		}
@@ -91,12 +96,12 @@ func DecodeBlockMetaFromReader(r io.Reader) ([]*Meta, error) {
 	}
 }
 
-func decodeBlock(r io.Reader) (*Meta, error) {
-	offset, err := readUint32(r)
+func decodeBlock(r io.Reader, buffer []byte) (*Meta, error) {
+	offset, err := readUint32(r, buffer)
 	if err != nil {
 		return nil, err
 	}
-	firstKeyLen, err := readUint16(r)
+	firstKeyLen, err := readUint16(r, buffer)
 	if err != nil {
 		return nil, err
 	}
