@@ -89,7 +89,8 @@ func TestBlockMeta(t *testing.T) {
 	t.Run("test-block-meta-encode-and-decode", func(t *testing.T) {
 		bms := generateBlockMeta()
 		blockMeta := block.EncodedBlockMeta(bms)
-		bmsN := block.DecodeBlockMeta(blockMeta)
+		bmsN, err := block.DecodeBlockMeta(blockMeta)
+		assert.Nil(t, err)
 		assert.Equal(t, bms, bmsN)
 	})
 }

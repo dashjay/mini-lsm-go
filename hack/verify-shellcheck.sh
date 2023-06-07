@@ -22,4 +22,4 @@ trap 'echo ERROR: shellcheck failed >&2' ERR
 
 shellcheck="$1"
 
-find . -name '*.sh' -not -path '*/node_modules/*' -not -path './bazel-*/*' -exec "$shellcheck" --color=always {} +
+find . -name '*.sh' -exec "$shellcheck" --color=always {} +

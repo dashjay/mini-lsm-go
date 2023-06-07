@@ -26,24 +26,35 @@ func NewBlockBuilder(size uint16) *Builder {
 	}
 }
 
-// estimatedSize is for estimateSize for Block
+// currentSize is for estimateSize for Block
 // layout of Block is like this:
-// | data(N Byte) | offset0(2 Byte) | offset1 ... | offsetN | offsetNum(dataNum | 2Byte) |
+// | offsetLen | offset0(2 Byte) | offset1 ... | offsetN | dataLen | data(N Byte)  |
 // Builder can estimate size of a Block
-func (b *Builder) estimatedSize() uint16 {
-	return SizeOfUint16 + uint16(len(b.offsets))*SizeOfUint16 + SizeOfUint16 + uint16(len(b.data))
+func (b *Builder) currentSize() uint16 {
+	return SizeOfUint16 +
+		uint16(len(b.offsets))*SizeOfUint16 +
+		SizeOfUint16 +
+		uint16(len(b.data))
 }
 
 func (b *Builder) IsEmpty() bool {
 	return len(b.offsets) == 0
 }
 
+type stringOrByteSlice interface {
+	string | []byte
+}
+
+func estimateGrow[T stringOrByteSlice](key, value T) uint16 {
+	return uint16(len(key)) + uint16(len(value)) +
+		SizeOfUint16*2 + SizeOfUint16
+}
+
 // Add receives a pair of key value(string), return whether it was added to builder
 func (b *Builder) Add(key, value string) bool {
 	utils.Assert(key != "", "expect none empty key")
 
-	if b.estimatedSize()+uint16(len(key))+uint16(len(value))+
-		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
+	if b.currentSize()+estimateGrow(key, value) > b.blockSize &&
 		!b.IsEmpty() {
 		return false
 	}
@@ -61,8 +72,7 @@ func (b *Builder) AddByte(key, value []byte) bool {
 
 	// estimate size calculate out Block size
 	// check if it is enough to append a pair of key, value, their size and an offset.
-	if b.estimatedSize()+uint16(len(key))+uint16(len(value))+
-		SizeOfUint16*2+SizeOfUint16 > b.blockSize &&
+	if b.currentSize()+estimateGrow(key, value) > b.blockSize &&
 		!b.IsEmpty() {
 		return false
 	}
